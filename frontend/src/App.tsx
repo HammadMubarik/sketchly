@@ -1,6 +1,6 @@
 import { AuthProvider } from '../Contexts/AuthContext'
 import { ProtectedRoute } from './components/Auth/ProtectedRoute'
-import { SketchlyCanvas } from './components/Canvas/SketchlyCanvas'
+import SketchlyCanvas from './components/Canvas/SketchlyCanvas'
 
 function App() {
   return (

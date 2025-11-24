@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { Tldraw, Editor, TLDrawShape, track, useEditor } from '@tldraw/tldraw'
-import '@tldraw/tldraw/tldraw.css'
-import { getQuickDrawRecognizer } from '../../utils/quickDrawRecognizer'
+import { Tldraw, Editor, track, useEditor } from '@tldraw/tldraw'
+import type { TLDrawShape } from '@tldraw/tldraw'
+import { getGoogleVisionRecognizer } from '../../utils/googleVisionRecognizer'
 import { UserProfile } from '../Auth/UserProfile'
 
 function QuickDrawPanel({ editor }: { editor: Editor }) {
@@ -10,7 +10,7 @@ function QuickDrawPanel({ editor }: { editor: Editor }) {
   const [modelReady, setModelReady] = useState(false)
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3)
 
-  const recognizer = getQuickDrawRecognizer()
+const recognizer = getGoogleVisionRecognizer('AIzaSyCg3LlGyjzfjKk6q4WHiQk-B5TgM7YA-kQ');
 
   useEffect(() => {
     const checkReady = setInterval(() => {
@@ -70,25 +70,30 @@ function QuickDrawPanel({ editor }: { editor: Editor }) {
     }
   }, [editor, enabled, isProcessing, modelReady, confidenceThreshold, recognizer])
 
-  useEffect(() => {
-    if (!enabled || !modelReady) return
+ useEffect(() => {
+  if (!enabled || !modelReady) return
 
-    let timeoutId: NodeJS.Timeout
+  let timeoutId: ReturnType<typeof setTimeout>
 
-    const handlePointerUp = () => {
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => {
-        processShape()
-      }, 200)
+  const handlePointerUp = () => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => {
+      processShape()
+    }, 200)
+  }
+
+  const container = document.querySelector('.tl-canvas')
+  if (container) {
+    container.addEventListener('pointerup', handlePointerUp as any)
+  }
+
+  return () => {
+    if (container) {
+      container.removeEventListener('pointerup', handlePointerUp as any)
     }
-
-    editor.root.addEventListener('pointerup', handlePointerUp)
-
-    return () => {
-      editor.root.removeEventListener('pointerup', handlePointerUp)
-      clearTimeout(timeoutId)
-    }
-  }, [editor, enabled, modelReady, processShape])
+    clearTimeout(timeoutId)
+  }
+}, [editor, enabled, modelReady, processShape])
 
   return (
     <div style={{
@@ -182,7 +187,6 @@ const TrackedQuickDrawPanel = track(function TrackedPanel() {
 export default function SketchlyCanvas() {
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
-     <UserProfile />
       <Tldraw>
         <TrackedQuickDrawPanel />
       </Tldraw>
