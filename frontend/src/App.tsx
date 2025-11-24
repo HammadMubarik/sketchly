@@ -9,7 +9,7 @@ function App() {
         <SketchlyCanvas />
       </ProtectedRoute>
     </AuthProvider>
-  )
+  ) 
 }
 
 export default App

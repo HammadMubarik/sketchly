@@ -37,7 +37,7 @@ export function UserProfile() {
           fontWeight: '500'
         }}
       >
-        Sign Out
+        Sign Out test123123 password
       </button>
     </div>
   )
