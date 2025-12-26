@@ -10,13 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google-cloud/vision": "^5.3.4",
-    "@supabase/supabase-js": "^2.81.0",
-    "@tensorflow/tfjs": "4.11.0",
-    "@tensorflow/tfjs-backend-webgl": "4.11.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "@tldraw/tldraw": "^4.1.2",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "y-websocket": "^2.0.4",
+    "yjs": "^13.6.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
