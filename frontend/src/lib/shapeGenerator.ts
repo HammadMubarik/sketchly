@@ -31,20 +31,13 @@ export interface TrainingDataset {
 export class ShapeDataGenerator {
   private readonly shapeNames = [
     'circle',
-    'ellipse',
     'square',
-    'rectangle',
-    'triangle',
-    'line',
-    'arrow',
-    'double-arrow',
-    'star',
-    'pentagon',
-    'hexagon',
+    'arrow-left',
+    'arrow-right',
+    'arrow-up',
+    'arrow-down',
     'diamond',
-    'check',
-    'x',
-    'heart',
+    'line',
   ]
 
   private readonly defaultAugmentation: AugmentationConfig = {
@@ -93,34 +86,20 @@ export class ShapeDataGenerator {
     switch (shapeName) {
       case 'circle':
         return this.generateCircle()
-      case 'ellipse':
-        return this.generateEllipse()
       case 'square':
         return this.generateSquare()
-      case 'rectangle':
-        return this.generateRectangle()
-      case 'triangle':
-        return this.generateTriangle()
-      case 'line':
-        return this.generateLine()
-      case 'arrow':
-        return this.generateArrow()
-      case 'double-arrow':
-        return this.generateDoubleArrow()
-      case 'star':
-        return this.generateStar()
-      case 'pentagon':
-        return this.generatePentagon()
-      case 'hexagon':
-        return this.generateHexagon()
+      case 'arrow-left':
+        return this.generateArrowLeft()
+      case 'arrow-right':
+        return this.generateArrowRight()
+      case 'arrow-up':
+        return this.generateArrowUp()
+      case 'arrow-down':
+        return this.generateArrowDown()
       case 'diamond':
         return this.generateDiamond()
-      case 'check':
-        return this.generateCheck()
-      case 'x':
-        return this.generateX()
-      case 'heart':
-        return this.generateHeart()
+      case 'line':
+        return this.generateLine()
       default:
         return this.generateCircle()
     }
@@ -242,7 +221,7 @@ export class ShapeDataGenerator {
     ]
   }
 
-  private generateArrow(): Point[] {
+  private generateArrowRight(): Point[] {
     const length = 50 + Math.random() * 20
     const cx = 50
     const cy = 50
@@ -251,11 +230,11 @@ export class ShapeDataGenerator {
 
     const points: Point[] = []
 
-    // Shaft
+    // Shaft (left to right)
     points.push({ x: cx - length / 2, y: cy })
     points.push({ x: cx + length / 2, y: cy })
 
-    // Arrowhead
+    // Arrowhead pointing right
     const tipX = cx + length / 2
     const tipY = cy
     points.push({
@@ -266,6 +245,93 @@ export class ShapeDataGenerator {
     points.push({
       x: tipX - arrowheadSize * Math.cos(arrowheadAngle),
       y: tipY + arrowheadSize * Math.sin(arrowheadAngle),
+    })
+
+    return points
+  }
+
+  private generateArrowLeft(): Point[] {
+    const length = 50 + Math.random() * 20
+    const cx = 50
+    const cy = 50
+    const arrowheadSize = 8 + Math.random() * 4
+    const arrowheadAngle = (Math.PI / 6) + (Math.random() * Math.PI) / 12
+
+    const points: Point[] = []
+
+    // Shaft (right to left)
+    points.push({ x: cx + length / 2, y: cy })
+    points.push({ x: cx - length / 2, y: cy })
+
+    // Arrowhead pointing left
+    const tipX = cx - length / 2
+    const tipY = cy
+    points.push({
+      x: tipX + arrowheadSize * Math.cos(arrowheadAngle),
+      y: tipY - arrowheadSize * Math.sin(arrowheadAngle),
+    })
+    points.push({ x: tipX, y: tipY })
+    points.push({
+      x: tipX + arrowheadSize * Math.cos(arrowheadAngle),
+      y: tipY + arrowheadSize * Math.sin(arrowheadAngle),
+    })
+
+    return points
+  }
+
+  private generateArrowUp(): Point[] {
+    const length = 50 + Math.random() * 20
+    const cx = 50
+    const cy = 50
+    const arrowheadSize = 8 + Math.random() * 4
+    const arrowheadAngle = (Math.PI / 6) + (Math.random() * Math.PI) / 12
+
+    const points: Point[] = []
+
+    // Shaft (bottom to top)
+    points.push({ x: cx, y: cy + length / 2 })
+    points.push({ x: cx, y: cy - length / 2 })
+
+    // Arrowhead pointing up
+    const tipX = cx
+    const tipY = cy - length / 2
+    points.push({
+      x: tipX - arrowheadSize * Math.sin(arrowheadAngle),
+      y: tipY + arrowheadSize * Math.cos(arrowheadAngle),
+    })
+    points.push({ x: tipX, y: tipY })
+    points.push({
+      x: tipX + arrowheadSize * Math.sin(arrowheadAngle),
+      y: tipY + arrowheadSize * Math.cos(arrowheadAngle),
+    })
+
+    return points
+  }
+
+  private generateArrowDown(): Point[] {
+    const length = 50 + Math.random() * 20
+    const cx = 50
+    const cy = 50
+    const arrowheadSize = 8 + Math.random() * 4
+    const arrowheadAngle = (Math.PI / 6) + (Math.random() * Math.PI) / 12
+
+    const points: Point[] = []
+
+    // Shaft (top to bottom)
+    points.push({ x: cx, y: cy - length / 2 })
+    points.push({ x: cx, y: cy + length / 2 })
+
+    // Arrowhead pointing down
+    const tipX = cx
+    const tipY = cy + length / 2
+    points.push({
+      x: tipX - arrowheadSize * Math.sin(arrowheadAngle),
+      y: tipY - arrowheadSize * Math.cos(arrowheadAngle),
+    })
+    points.push({ x: tipX, y: tipY })
+    points.push({
+      x: tipX + arrowheadSize * Math.sin(arrowheadAngle),
+      y: tipY - arrowheadSize * Math.cos(arrowheadAngle),
     })
 
     return points

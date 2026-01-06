@@ -29,7 +29,7 @@ export async function trainModelInBrowser() {
     Float32Array.from(dataset.inputs.flatMap((img) => Array.from(img))),
     [dataset.inputs.length, 28, 28, 1]
   )
-  const ys = tf.oneHot(dataset.labels, 15)
+  const ys = tf.oneHot(dataset.labels, 8)
 
   console.log(`Input shape: ${xs.shape}`)
   console.log(`Label shape: ${ys.shape}`)
@@ -48,9 +48,9 @@ export async function trainModelInBrowser() {
   console.log('\nStep 4: Splitting into train/validation...')
   const numTrain = Math.floor(dataset.inputs.length * 0.9)
   const trainXs = shuffledXs.slice([0, 0, 0, 0], [numTrain, 28, 28, 1])
-  const trainYs = shuffledYs.slice([0, 0], [numTrain, 15])
+  const trainYs = shuffledYs.slice([0, 0], [numTrain, 8])
   const valXs = shuffledXs.slice([numTrain, 0, 0, 0], [-1, 28, 28, 1])
-  const valYs = shuffledYs.slice([numTrain, 0], [-1, 15])
+  const valYs = shuffledYs.slice([numTrain, 0], [-1, 8])
 
   console.log(`Training samples: ${numTrain}`)
   console.log(`Validation samples: ${dataset.inputs.length - numTrain}`)

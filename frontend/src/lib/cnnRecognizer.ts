@@ -21,20 +21,13 @@ export class CNNShapeRecognizer {
   private readonly modelUrl = '/models/shape-recognizer/model.json'
   private readonly shapeNames = [
     'circle',
-    'ellipse',
     'square',
-    'rectangle',
-    'triangle',
-    'line',
-    'arrow',
-    'double-arrow',
-    'star',
-    'pentagon',
-    'hexagon',
+    'arrow-left',
+    'arrow-right',
+    'arrow-up',
+    'arrow-down',
     'diamond',
-    'check',
-    'x',
-    'heart',
+    'line',
   ]
 
   async loadModel(): Promise<void> {

@@ -64,7 +64,7 @@ export function createCNNModel(inputSize: number = 28): tf.Sequential {
       }),
 
       tf.layers.dense({
-        units: 15, // 15 shape classes
+        units: 8, // 8 shape classes
         activation: 'softmax',
         name: 'output',
       }),
@@ -84,20 +84,13 @@ export function compileCNNModel(model: tf.Sequential): void {
 
 export const SHAPE_CLASSES = [
   'circle',
-  'ellipse',
   'square',
-  'rectangle',
-  'triangle',
-  'line',
-  'arrow',
-  'double-arrow',
-  'star',
-  'pentagon',
-  'hexagon',
+  'arrow-left',
+  'arrow-right',
+  'arrow-up',
+  'arrow-down',
   'diamond',
-  'check',
-  'x',
-  'heart',
+  'line',
 ]
 
 export function getModelSummary(model: tf.Sequential): void {

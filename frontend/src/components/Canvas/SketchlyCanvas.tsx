@@ -153,23 +153,63 @@ const ShapeRecognitionHandler = track(() => {
                     props: { geo: 'star', w: size, h: size },
                   }])
                   break
-                case 'arrow': {
+                case 'arrow-left':
+                case 'arrow-right':
+                case 'arrow-up':
+                case 'arrow-down': {
                   const first = points[0]
                   const last = points[points.length - 1]
+
+                  // Find nearby shapes to bind to
+                  const allPageShapes = editor.getCurrentPageShapes()
+                  const geoShapes = allPageShapes.filter(s => s.type === 'geo')
+
+                  const SNAP_DISTANCE = 50 // pixels
+
+                  // Helper function to find nearest shape to a point
+                  const findNearestShape = (point: Point) => {
+                    let nearestShape = null
+                    let minDistance = SNAP_DISTANCE
+
+                    for (const shape of geoShapes) {
+                      if (shape.id === latestShape.id) continue
+                      const shapeBounds = editor.getShapePageBounds(shape)
+                      if (!shapeBounds) continue
+
+                      // Calculate distance to shape center
+                      const centerX = shapeBounds.x + shapeBounds.width / 2
+                      const centerY = shapeBounds.y + shapeBounds.height / 2
+                      const distance = Math.sqrt((point.x - centerX) ** 2 + (point.y - centerY) ** 2)
+
+                      if (distance < minDistance) {
+                        minDistance = distance
+                        nearestShape = shape
+                      }
+                    }
+
+                    return nearestShape
+                  }
+
+                  const startShape = findNearestShape(first)
+                  const endShape = findNearestShape(last)
+
+                  const newArrowId = createShapeId()
                   editor.createShapes([{
-                    id: createShapeId(),
+                    id: newArrowId,
                     type: 'arrow',
                     x: bounds.x,
                     y: bounds.y,
                     props: {
-                      start: { x: first.x - bounds.x, y: first.y - bounds.y },
-                      end: { x: last.x - bounds.x, y: last.y - bounds.y },
+                      start: startShape ? { type: 'binding', boundShapeId: startShape.id, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false } : { x: first.x - bounds.x, y: first.y - bounds.y },
+                      end: endShape ? { type: 'binding', boundShapeId: endShape.id, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false } : { x: last.x - bounds.x, y: last.y - bounds.y },
                       arrowheadStart: 'none',
-                      arrowheadEnd: 'none',
+                      arrowheadEnd: 'arrow',
                       color: (latestShape.props && (latestShape.props as any).color) || undefined,
                       size: (latestShape.props && (latestShape.props as any).size) || undefined,
                     },
                   }])
+
+                  console.log(`Arrow binding: start=${startShape ? 'bound' : 'free'}, end=${endShape ? 'bound' : 'free'}`)
                   break
                 }
                 case 'line': {
