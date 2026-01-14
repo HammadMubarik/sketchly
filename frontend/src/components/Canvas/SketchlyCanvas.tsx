@@ -93,11 +93,6 @@ const ShapeRecognitionHandler = track(() => {
             const centerY = bounds.y + bounds.height / 2
             const size = Math.max(Math.min(bounds.width, bounds.height), 40)
 
-            if (result.name === 'check' || result.name === 'x') {
-              console.log(`Keeping hand-drawn ${result.name}`)
-              return
-            }
-
             try {
               switch (result.name) {
                 case 'rectangle':

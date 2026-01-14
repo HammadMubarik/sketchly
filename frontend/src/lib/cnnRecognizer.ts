@@ -200,13 +200,6 @@ export class CNNShapeRecognizer {
     }
   }
 
-  getModelInfo(): string {
-    if (!this.model) {
-      return 'Model not loaded'
-    }
-
-    return `CNN Model: ${this.shapeNames.length} classes, loaded from ${this.modelUrl}`
-  }
 }
 
 // Singleton instance

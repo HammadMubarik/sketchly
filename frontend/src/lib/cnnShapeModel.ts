@@ -82,17 +82,6 @@ export function compileCNNModel(model: tf.Sequential): void {
   })
 }
 
-export const SHAPE_CLASSES = [
-  'circle',
-  'square',
-  'arrow-left',
-  'arrow-right',
-  'arrow-up',
-  'arrow-down',
-  'diamond',
-  'line',
-]
-
 export function getModelSummary(model: tf.Sequential): void {
   console.log('Model Summary:')
   model.summary()

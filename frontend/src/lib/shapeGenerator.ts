@@ -122,24 +122,6 @@ export class ShapeDataGenerator {
     return points
   }
 
-  private generateEllipse(): Point[] {
-    const cx = 50
-    const cy = 50
-    const rx = 30 + Math.random() * 10
-    const ry = rx * (1.5 + Math.random() * 1.5) // aspect ratio 1.5-3.0
-    const points: Point[] = []
-    const numPoints = 50 + Math.floor(Math.random() * 30)
-
-    for (let i = 0; i <= numPoints; i++) {
-      const theta = (i / numPoints) * 2 * Math.PI
-      const x = cx + rx * Math.cos(theta)
-      const y = cy + ry * Math.sin(theta)
-      points.push({ x, y })
-    }
-
-    return points
-  }
-
   private generateSquare(): Point[] {
     const size = 50 + Math.random() * 20
     const cx = 50
@@ -153,60 +135,6 @@ export class ShapeDataGenerator {
       { x: cx - halfSize, y: cy + halfSize },
       { x: cx - halfSize, y: cy - halfSize },
     ]
-  }
-
-  private generateRectangle(): Point[] {
-    const width = 50 + Math.random() * 20
-    const height = width * (1.5 + Math.random() * 1.5) // aspect ratio 1.5-3.0
-    const cx = 50
-    const cy = 50
-    const halfW = width / 2
-    const halfH = height / 2
-
-    return [
-      { x: cx - halfW, y: cy - halfH },
-      { x: cx + halfW, y: cy - halfH },
-      { x: cx + halfW, y: cy + halfH },
-      { x: cx - halfW, y: cy + halfH },
-      { x: cx - halfW, y: cy - halfH },
-    ]
-  }
-
-  private generateTriangle(): Point[] {
-    const size = 50 + Math.random() * 20
-    const cx = 50
-    const cy = 50
-
-    // Vary triangle type
-    const type = Math.floor(Math.random() * 3)
-
-    if (type === 0) {
-      // Equilateral
-      const h = (size * Math.sqrt(3)) / 2
-      return [
-        { x: cx, y: cy - (2 * h) / 3 },
-        { x: cx - size / 2, y: cy + h / 3 },
-        { x: cx + size / 2, y: cy + h / 3 },
-        { x: cx, y: cy - (2 * h) / 3 },
-      ]
-    } else if (type === 1) {
-      // Isosceles
-      const h = size * (0.8 + Math.random() * 0.4)
-      return [
-        { x: cx, y: cy - h / 2 },
-        { x: cx - size / 2, y: cy + h / 2 },
-        { x: cx + size / 2, y: cy + h / 2 },
-        { x: cx, y: cy - h / 2 },
-      ]
-    } else {
-      // Right-angled
-      return [
-        { x: cx - size / 2, y: cy - size / 2 },
-        { x: cx + size / 2, y: cy + size / 2 },
-        { x: cx - size / 2, y: cy + size / 2 },
-        { x: cx - size / 2, y: cy - size / 2 },
-      ]
-    }
   }
 
   private generateLine(): Point[] {
@@ -337,91 +265,6 @@ export class ShapeDataGenerator {
     return points
   }
 
-  private generateDoubleArrow(): Point[] {
-    const length = 50 + Math.random() * 20
-    const cx = 50
-    const cy = 50
-    const arrowheadSize = 8 + Math.random() * 4
-    const arrowheadAngle = (Math.PI / 6) + (Math.random() * Math.PI) / 12
-
-    const points: Point[] = []
-
-    // Left arrowhead
-    const leftTipX = cx - length / 2
-    const leftTipY = cy
-    points.push({
-      x: leftTipX + arrowheadSize * Math.cos(arrowheadAngle),
-      y: leftTipY - arrowheadSize * Math.sin(arrowheadAngle),
-    })
-    points.push({ x: leftTipX, y: leftTipY })
-    points.push({
-      x: leftTipX + arrowheadSize * Math.cos(arrowheadAngle),
-      y: leftTipY + arrowheadSize * Math.sin(arrowheadAngle),
-    })
-
-    // Shaft
-    points.push({ x: cx - length / 2, y: cy })
-    points.push({ x: cx + length / 2, y: cy })
-
-    // Right arrowhead
-    const rightTipX = cx + length / 2
-    const rightTipY = cy
-    points.push({
-      x: rightTipX - arrowheadSize * Math.cos(arrowheadAngle),
-      y: rightTipY - arrowheadSize * Math.sin(arrowheadAngle),
-    })
-    points.push({ x: rightTipX, y: rightTipY })
-    points.push({
-      x: rightTipX - arrowheadSize * Math.cos(arrowheadAngle),
-      y: rightTipY + arrowheadSize * Math.sin(arrowheadAngle),
-    })
-
-    return points
-  }
-
-  private generateStar(): Point[] {
-    const cx = 50
-    const cy = 50
-    const outerRadius = 30 + Math.random() * 10
-    const innerRadius = outerRadius * (0.4 + Math.random() * 0.2)
-    const points: Point[] = []
-    const numPoints = 5
-
-    for (let i = 0; i < numPoints * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius
-      const angle = (i * Math.PI) / numPoints - Math.PI / 2
-      const x = cx + radius * Math.cos(angle)
-      const y = cy + radius * Math.sin(angle)
-      points.push({ x, y })
-    }
-    points.push(points[0]) // Close the shape
-
-    return points
-  }
-
-  private generatePentagon(): Point[] {
-    return this.generatePolygon(5, 30 + Math.random() * 10)
-  }
-
-  private generateHexagon(): Point[] {
-    return this.generatePolygon(6, 30 + Math.random() * 10)
-  }
-
-  private generatePolygon(sides: number, radius: number): Point[] {
-    const cx = 50
-    const cy = 50
-    const points: Point[] = []
-
-    for (let i = 0; i <= sides; i++) {
-      const angle = (i * 2 * Math.PI) / sides - Math.PI / 2
-      const x = cx + radius * Math.cos(angle)
-      const y = cy + radius * Math.sin(angle)
-      points.push({ x, y })
-    }
-
-    return points
-  }
-
   private generateDiamond(): Point[] {
     const size = 50 + Math.random() * 20
     const cx = 50
@@ -434,55 +277,6 @@ export class ShapeDataGenerator {
       { x: cx - size / 2, y: cy },
       { x: cx, y: cy - size / 2 },
     ]
-  }
-
-  private generateCheck(): Point[] {
-    const size = 40 + Math.random() * 20
-    const cx = 50
-    const cy = 50
-
-    return [
-      { x: cx - size / 2, y: cy },
-      { x: cx - size / 6, y: cy + size / 2 },
-      { x: cx + size / 2, y: cy - size / 3 },
-    ]
-  }
-
-  private generateX(): Point[] {
-    const size = 40 + Math.random() * 20
-    const cx = 50
-    const cy = 50
-    const halfSize = size / 2
-
-    return [
-      { x: cx - halfSize, y: cy - halfSize },
-      { x: cx + halfSize, y: cy + halfSize },
-      { x: cx, y: cy },
-      { x: cx - halfSize, y: cy + halfSize },
-      { x: cx + halfSize, y: cy - halfSize },
-    ]
-  }
-
-  private generateHeart(): Point[] {
-    const cx = 50
-    const cy = 50
-    const size = 30 + Math.random() * 10
-    const points: Point[] = []
-    const numPoints = 100
-
-    for (let i = 0; i <= numPoints; i++) {
-      const t = (i / numPoints) * 2 * Math.PI
-      // Parametric heart equation
-      const x = 16 * Math.pow(Math.sin(t), 3)
-      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
-
-      points.push({
-        x: cx + (x * size) / 16,
-        y: cy + (y * size) / 16,
-      })
-    }
-
-    return points
   }
 
   private applyAugmentation(points: Point[], config: AugmentationConfig): Point[] {
