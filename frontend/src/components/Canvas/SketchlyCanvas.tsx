@@ -222,8 +222,8 @@ const ShapeRecognitionHandler = track(() => {
                     y: bounds.y,
                     props: {
                       points: [
-                        { id: createShapeId(), index: 0, x: first.x - bounds.x, y: first.y - bounds.y },
-                        { id: createShapeId(), index: 1, x: last.x - bounds.x, y: last.y - bounds.y },
+                        { id: createShapeId(), index: 'a1' as any, x: first.x - bounds.x, y: first.y - bounds.y },
+                        { id: createShapeId(), index: 'a2' as any, x: last.x - bounds.x, y: last.y - bounds.y },
                       ],
                       color: (latestShape.props && (latestShape.props as any).color) || undefined,
                       size: (latestShape.props && (latestShape.props as any).size) || undefined,
@@ -287,47 +287,6 @@ const ShapeRecognitionHandler = track(() => {
 export function SketchlyCanvas() {
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
-      {/* Info banner */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: 'white',
-          padding: '14px 28px',
-          borderRadius: '12px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          border: '2px solid #10b981',
-          animation: 'fadeIn 0.5s ease-in',
-        }}
-      >
-        <style>
-          {`
-            @keyframes fadeIn {
-              from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-              to { opacity: 1; transform: translateX(-50%) translateY(0); }
-            }
-            @keyframes pulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.6; }
-            }
-          `}
-        </style>
-        <div>
-          <div style={{ fontWeight: 'bold', color: '#1f2937', fontSize: '14px' }}>
-            Instant Shape Recognition
-          </div>
-          <div style={{ fontSize: '12px', color: '#6b7280' }}>
-            Draw with pen tool - shapes auto-convert when you release!
-          </div>
-        </div>
-      </div>
-
       <Tldraw>
         <ShapeRecognitionHandler />
       </Tldraw>

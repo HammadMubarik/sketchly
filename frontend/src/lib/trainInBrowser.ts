@@ -117,8 +117,13 @@ export async function trainModelInBrowser() {
 
   // 9. Save model
   console.log('\nStep 9: Saving model...')
+  await model.save('indexeddb://shape-recognizer')
+  console.log('Model saved to browser storage!')
+  console.log('Now downloading model files...')
+
+  // Also download for backup
   await model.save('downloads://shape-recognizer')
-  console.log('Model downloaded! Move the files to frontend/public/models/shape-recognizer/')
+  console.log('Model files downloaded to your Downloads folder as backup')
 
   // Clean up
   trainXs.dispose()
