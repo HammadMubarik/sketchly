@@ -28,7 +28,7 @@ export function UserProfile() {
         onClick={handleSignOut}
         style={{
           padding: '0.5rem 1rem',
-          background: '#646cff',
+          background: '#0f0f72ff',
           color: 'white',
           border: 'none',
           borderRadius: '4px',

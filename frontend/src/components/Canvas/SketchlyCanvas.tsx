@@ -4,6 +4,7 @@ import '@tldraw/tldraw/tldraw.css'
 import { cnnRecognizer } from '../../lib/cnnRecognizer'
 import type { Point } from '../../lib/cnnRecognizer'
 import { useEffect, useRef } from 'react'
+import { UserProfile } from '../Auth/UserProfile'
 
 const ShapeRecognitionHandler = track(() => {
   const editor = useEditor()
@@ -287,6 +288,7 @@ const ShapeRecognitionHandler = track(() => {
 export function SketchlyCanvas() {
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
+      <UserProfile />
       <Tldraw>
         <ShapeRecognitionHandler />
       </Tldraw>
