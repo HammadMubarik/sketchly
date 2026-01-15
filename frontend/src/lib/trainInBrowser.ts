@@ -17,8 +17,8 @@ export async function trainModelInBrowser() {
   const generator = new ShapeDataGenerator()
   const dataset = generator.generateDataset({
     canvasSize: 28,
-    samplesPerClass: 2000, // 2000 * 15 = 30,000 samples (reduced for browser)
-    augmentationPasses: 6,
+    samplesPerClass: 400,
+    augmentationPasses: 2,
   })
 
   console.log(`Dataset generated: ${dataset.inputs.length} samples`)
@@ -71,8 +71,8 @@ export async function trainModelInBrowser() {
   const startTime = Date.now()
 
   await model.fit(trainXs, trainYs, {
-    epochs: 30,
-    batchSize: 32,
+    epochs: 15,
+    batchSize: 128,
     validationData: [valXs, valYs],
     callbacks: {
       onEpochEnd: (epoch, logs) => {

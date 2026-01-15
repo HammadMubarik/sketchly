@@ -78,9 +78,8 @@ const ShapeRecognitionHandler = track(() => {
 
             lastShapeIdRef.current = latestShape.id
 
-            // Lower threshold for backend API (0.35) since it uses different algorithm
-            // CNN will use 0.7 when model is trained
-            const threshold = result.confidence > 1 ? 0.7 : 0.35
+            // Confidence threshold for shape recognition
+            const threshold = 0.20
             if (result.confidence <= threshold || result.name === 'unknown') {
               console.log(`Low confidence (${(result.confidence * 100).toFixed(1)}%), keeping hand-drawn shape`)
               return

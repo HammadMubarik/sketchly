@@ -40,16 +40,9 @@ export class CNNShapeRecognizer {
       console.log('Loading CNN shape recognition model...')
       const startTime = performance.now()
 
-      // Try loading from IndexedDB first (trained in browser)
-      try {
-        this.model = await tf.loadLayersModel('indexeddb://shape-recognizer')
-        console.log('Loaded model from browser storage')
-      } catch (indexedDbError) {
-        // Fallback to public folder
-        console.log('Model not in browser storage, trying public folder...')
-        this.model = await tf.loadLayersModel(this.modelUrl)
-        console.log('Loaded model from public folder')
-      }
+      // Load from public folder (pre-trained model)
+      this.model = await tf.loadLayersModel(this.modelUrl)
+      console.log('Loaded model from public folder')
 
       const loadTime = performance.now() - startTime
       console.log(`CNN model loaded successfully in ${loadTime.toFixed(0)}ms`)
