@@ -115,3 +115,13 @@ tmp/
 
 # Diagnostic reports
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Windows system files
+nul
+
+# Claude Code settings
+.claude/
+settings.local.json
+
+# Model weights (large binary files)
+*.weights.bin

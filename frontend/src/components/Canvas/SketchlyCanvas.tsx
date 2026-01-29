@@ -3,8 +3,42 @@ import type { TLShapeId } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
 import { cnnRecognizer } from '../../lib/cnnRecognizer'
 import type { Point } from '../../lib/cnnRecognizer'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { UserProfile } from '../Auth/UserProfile'
+import { AutoSaveHandler } from './AutoSaveHandler'
+
+function SaveStatusIndicator({
+  isSaving,
+  lastSavedAt,
+}: {
+  isSaving: boolean
+  lastSavedAt: Date | null
+}) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: '1rem',
+        right: '1rem',
+        zIndex: 1000,
+        background: 'white',
+        padding: '0.5rem 0.75rem',
+        borderRadius: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        fontSize: '0.75rem',
+        color: '#666',
+      }}
+    >
+      {isSaving ? (
+        <span>Saving...</span>
+      ) : lastSavedAt ? (
+        <span>Saved {lastSavedAt.toLocaleTimeString()}</span>
+      ) : (
+        <span>Not saved yet</span>
+      )}
+    </div>
+  )
+}
 
 const ShapeRecognitionHandler = track(() => {
   const editor = useEditor()
@@ -280,11 +314,18 @@ const ShapeRecognitionHandler = track(() => {
 })
 
 export function SketchlyCanvas() {
+  const [saveStatus, setSaveStatus] = useState<{
+    isSaving: boolean
+    lastSavedAt: Date | null
+  }>({ isSaving: false, lastSavedAt: null })
+
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
       <UserProfile />
+      <SaveStatusIndicator isSaving={saveStatus.isSaving} lastSavedAt={saveStatus.lastSavedAt} />
       <Tldraw>
         <ShapeRecognitionHandler />
+        <AutoSaveHandler onSaveStatusChange={setSaveStatus} debounceMs={2000} />
       </Tldraw>
     </div>
   )

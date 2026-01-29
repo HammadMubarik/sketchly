@@ -17,8 +17,8 @@ export async function trainModelInBrowser() {
   const generator = new ShapeDataGenerator()
   const dataset = generator.generateDataset({
     canvasSize: 28,
-    samplesPerClass: 400,
-    augmentationPasses: 2,
+    samplesPerClass: 2000,
+    augmentationPasses: 6,
   })
 
   console.log(`Dataset generated: ${dataset.inputs.length} samples`)
@@ -66,13 +66,13 @@ export async function trainModelInBrowser() {
 
   // 6. Train
   console.log('\nStep 6: Training model...')
-  console.log('This will take 5-10 minutes...\n')
+  console.log('This will take several hours (overnight training)...\n')
 
   const startTime = Date.now()
 
   await model.fit(trainXs, trainYs, {
-    epochs: 15,
-    batchSize: 128,
+    epochs: 40,
+    batchSize: 64,
     validationData: [valXs, valYs],
     callbacks: {
       onEpochEnd: (epoch, logs) => {
@@ -82,7 +82,7 @@ export async function trainModelInBrowser() {
         const valAcc = ((logs?.val_acc ?? 0) * 100).toFixed(2)
 
         console.log(
-          `Epoch ${(epoch + 1).toString().padStart(2)}/30: ` +
+          `Epoch ${(epoch + 1).toString().padStart(2)}/40: ` +
             `loss=${loss} acc=${acc}% | ` +
             `val_loss=${valLoss} val_acc=${valAcc}%`
         )
