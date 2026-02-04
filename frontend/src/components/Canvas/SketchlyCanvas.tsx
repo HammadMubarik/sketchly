@@ -6,6 +6,11 @@ import type { Point } from '../../lib/cnnRecognizer'
 import { useEffect, useRef, useState } from 'react'
 import { UserProfile } from '../Auth/UserProfile'
 import { AutoSaveHandler } from './AutoSaveHandler'
+import { YjsSyncBridge, type Collaborator } from './YjsSyncBridge'
+import { CollaboratorCursors } from './CollaboratorCursors'
+import { CollaboratorList } from './CollaboratorList'
+import { ConnectionStatus } from './ConnectionStatus'
+import { ShareButton } from './ShareButton'
 
 function SaveStatusIndicator({
   isSaving,
@@ -319,13 +324,53 @@ export function SketchlyCanvas() {
     lastSavedAt: Date | null
   }>({ isSaving: false, lastSavedAt: null })
 
+  const [roomId, setRoomId] = useState<string | null>(null)
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
+
+  // Parse room ID from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlRoomId = params.get('room')
+    if (urlRoomId) {
+      setRoomId(urlRoomId)
+    }
+  }, [])
+
+  // When drawing is saved/loaded, use its ID as room ID
+  const handleDrawingLoaded = (drawingId: string) => {
+    if (!roomId) {
+      setRoomId(drawingId)
+      // Update URL without reload
+      const newUrl = `${window.location.pathname}?room=${drawingId}`
+      window.history.replaceState({}, '', newUrl)
+    }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
       <UserProfile />
+      {roomId && <ShareButton roomId={roomId} />}
+      <CollaboratorList collaborators={collaborators} />
+      {roomId && <ConnectionStatus status={connectionStatus} />}
       <SaveStatusIndicator isSaving={saveStatus.isSaving} lastSavedAt={saveStatus.lastSavedAt} />
       <Tldraw>
         <ShapeRecognitionHandler />
-        <AutoSaveHandler onSaveStatusChange={setSaveStatus} debounceMs={2000} />
+        {roomId && (
+          <>
+            <YjsSyncBridge
+              roomId={roomId}
+              onCollaboratorsChange={setCollaborators}
+              onConnectionStatusChange={setConnectionStatus}
+            />
+            <CollaboratorCursors collaborators={collaborators} />
+          </>
+        )}
+        <AutoSaveHandler
+          onSaveStatusChange={setSaveStatus}
+          onDrawingLoaded={handleDrawingLoaded}
+          debounceMs={5000}
+        />
       </Tldraw>
     </div>
   )

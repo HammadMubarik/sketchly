@@ -6,11 +6,13 @@ import { saveDrawingSnapshot, getDefaultDrawing } from '../../lib/drawingStorage
 
 interface AutoSaveHandlerProps {
   onSaveStatusChange?: (status: { isSaving: boolean; lastSavedAt: Date | null }) => void
+  onDrawingLoaded?: (drawingId: string) => void
   debounceMs?: number
 }
 
 export const AutoSaveHandler = track(function AutoSaveHandler({
   onSaveStatusChange,
+  onDrawingLoaded,
   debounceMs = 2000,
 }: AutoSaveHandlerProps) {
   const editor = useEditor()
@@ -40,6 +42,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
             isSaving: false,
             lastSavedAt: new Date(existingDrawing.updated_at),
           })
+          onDrawingLoaded?.(existingDrawing.id)
         } else {
           console.log('No existing drawing found, starting fresh')
         }
@@ -67,6 +70,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
       if (!drawingIdRef.current) {
         drawingIdRef.current = savedDrawing.id
         console.log('Created new drawing:', savedDrawing.id)
+        onDrawingLoaded?.(savedDrawing.id)
       }
 
       onSaveStatusChange?.({

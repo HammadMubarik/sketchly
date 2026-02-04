@@ -74,13 +74,56 @@ export class YjsStore {
   }
 
   /**
+   * Get the WebSocket provider
+   */
+  getProvider() {
+    return this.provider
+  }
+
+  /**
+   * Get local client ID
+   */
+  getClientId(): number {
+    return this.ydoc.clientID
+  }
+
+  /**
    * Update local user's cursor position
    */
-  updateCursor(x: number, y: number) {
+  updateCursor(x: number, y: number, pageId?: string) {
     const localState = this.awareness.getLocalState()
     this.awareness.setLocalState({
       ...localState,
-      cursor: { x, y },
+      cursor: { x, y, pageId },
+    })
+  }
+
+  /**
+   * Listen for connection status changes
+   */
+  onConnectionStatusChange(callback: (status: 'connecting' | 'connected' | 'disconnected') => void) {
+    this.provider.on('status', ({ status }: { status: string }) => {
+      callback(status as 'connecting' | 'connected' | 'disconnected')
+    })
+  }
+
+  /**
+   * Check if synced with server
+   */
+  isSynced(): boolean {
+    return this.provider.synced
+  }
+
+  /**
+   * Wait for initial sync
+   */
+  waitForSync(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.provider.synced) {
+        resolve()
+      } else {
+        this.provider.once('sync', () => resolve())
+      }
     })
   }
 
