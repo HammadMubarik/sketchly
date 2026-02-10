@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../../Contexts/AuthContext'
 import { Login } from '../Auth/Login'
 import { LandingPage } from '../Landing/LandingPage'
+import { ChevronLeft } from 'lucide-react'
 
 type AppView = 'landing' | 'canvas'
 
@@ -58,15 +59,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
-      >
-        <div>Loading...</div>
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-neutral-500">Loading...</div>
       </div>
     )
   }
@@ -83,28 +77,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     <>
       <button
         onClick={handleBackToLanding}
-        style={{
-          position: 'fixed',
-          top: '1rem',
-          left: '1rem',
-          zIndex: 1001,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          background: 'white',
-          color: '#333',
-          padding: '0.5rem 1rem',
-          borderRadius: '6px',
-          border: '1px solid #ddd',
-          fontSize: '0.875rem',
-          fontWeight: 500,
-          cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        }}
+        className="fixed top-4 left-4 z-[1001] flex items-center gap-2 bg-white text-neutral-700 py-2 px-4 rounded-lg border border-neutral-200 text-sm font-medium cursor-pointer shadow-sm hover:bg-neutral-50 transition-colors"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="15,18 9,12 15,6" />
-        </svg>
+        <ChevronLeft className="h-4 w-4" />
         Home
       </button>
       {children}
