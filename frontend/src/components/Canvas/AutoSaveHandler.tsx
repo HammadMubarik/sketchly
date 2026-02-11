@@ -2,17 +2,19 @@ import { useEffect, useRef } from 'react'
 import { track, useEditor } from '@tldraw/tldraw'
 import type { TLEditorSnapshot } from '@tldraw/tldraw'
 import { useAuth } from '../../../Contexts/AuthContext'
-import { saveDrawingSnapshot, getDefaultDrawing } from '../../lib/drawingStorage'
+import { saveDrawingSnapshot, getDrawingById } from '../../lib/drawingStorage'
 
 interface AutoSaveHandlerProps {
   onSaveStatusChange?: (status: { isSaving: boolean; lastSavedAt: Date | null }) => void
   onDrawingLoaded?: (drawingId: string) => void
+  roomId?: string | null
   debounceMs?: number
 }
 
 export const AutoSaveHandler = track(function AutoSaveHandler({
   onSaveStatusChange,
   onDrawingLoaded,
+  roomId,
   debounceMs = 2000,
 }: AutoSaveHandlerProps) {
   const editor = useEditor()
@@ -30,7 +32,15 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
 
     async function loadDrawing() {
       try {
-        const existingDrawing = await getDefaultDrawing(user!.id)
+        let existingDrawing = null
+
+        // If we have a roomId, load that specific drawing
+        if (roomId) {
+          existingDrawing = await getDrawingById(roomId)
+          console.log('Loading drawing by room ID:', roomId, existingDrawing ? 'found' : 'not found')
+        }
+
+        // No roomId means "Create New Room" — start with a blank canvas
 
         if (existingDrawing) {
           console.log('Loading existing drawing:', existingDrawing.id)
@@ -55,7 +65,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
     }
 
     loadDrawing()
-  }, [user?.id, editor, onSaveStatusChange])
+  }, [user?.id, editor, onSaveStatusChange, roomId])
 
   // Save function
   const performSave = async (snapshot: TLEditorSnapshot) => {

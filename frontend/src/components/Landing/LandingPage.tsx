@@ -4,6 +4,7 @@ import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar'
 import { LayoutDashboard, Plus, LogIn, LogOut, Settings, UserCog } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { PreviousRooms } from './PreviousRooms'
 
 interface LandingPageProps {
   onJoinRoom: (roomId: string) => void
@@ -90,7 +91,7 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
       {/* Main Content */}
       <div className="flex flex-1">
         <div className="p-4 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col flex-1 w-full h-full">
-          <div className="flex items-center justify-center flex-1">
+          <div className="flex items-start justify-center flex-1 overflow-y-auto py-10">
             <div className="w-full max-w-lg">
               <h1 className="text-4xl font-bold text-neutral-800 dark:text-white mb-2 text-center">
                 Sketchly
@@ -152,6 +153,9 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
                   </button>
                 </div>
               </div>
+
+              {/* Previous Rooms */}
+              <PreviousRooms onJoinRoom={onJoinRoom} />
             </div>
           </div>
         </div>

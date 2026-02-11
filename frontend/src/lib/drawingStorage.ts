@@ -11,20 +11,19 @@ export interface Drawing {
   is_default: boolean
 }
 
-export async function getDefaultDrawing(userId: string): Promise<Drawing | null> {
+export async function getDrawingById(drawingId: string): Promise<Drawing | null> {
   const { data, error } = await supabase
     .from('drawings')
     .select('*')
-    .eq('user_id', userId)
-    .eq('is_default', true)
+    .eq('id', drawingId)
     .single()
 
   if (error) {
     if (error.code === 'PGRST116') {
       return null
     }
-    console.error('Error fetching default drawing:', error)
-    throw error
+    console.error('Error fetching drawing by ID:', error)
+    return null
   }
 
   return data
@@ -56,7 +55,7 @@ export async function saveDrawingSnapshot(
         user_id: userId,
         name: 'Untitled Drawing',
         snapshot,
-        is_default: true,
+        is_default: false,
       })
       .select()
       .single()
@@ -67,5 +66,65 @@ export async function saveDrawingSnapshot(
     }
 
     return data
+  }
+}
+
+// --- Room Visits ---
+
+export interface RoomVisit {
+  id: string
+  user_id: string
+  drawing_id: string
+  room_name: string
+  last_visited_at: string
+  created_at: string
+}
+
+export async function recordRoomVisit(
+  userId: string,
+  drawingId: string,
+  roomName: string = 'Untitled Drawing'
+): Promise<void> {
+  const { error } = await supabase
+    .from('room_visits')
+    .upsert(
+      {
+        user_id: userId,
+        drawing_id: drawingId,
+        room_name: roomName,
+        last_visited_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,drawing_id' }
+    )
+
+  if (error) {
+    console.error('Error recording room visit:', error)
+  }
+}
+
+export async function getUserRoomVisits(userId: string): Promise<RoomVisit[]> {
+  const { data, error } = await supabase
+    .from('room_visits')
+    .select('*')
+    .eq('user_id', userId)
+    .order('last_visited_at', { ascending: false })
+    .limit(20)
+
+  if (error) {
+    console.error('Error fetching room visits:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function deleteRoomVisit(visitId: string): Promise<void> {
+  const { error } = await supabase
+    .from('room_visits')
+    .delete()
+    .eq('id', visitId)
+
+  if (error) {
+    console.error('Error deleting room visit:', error)
   }
 }

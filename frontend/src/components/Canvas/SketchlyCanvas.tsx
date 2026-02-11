@@ -6,6 +6,8 @@ import type { Point } from '../../lib/cnnRecognizer'
 import { useEffect, useRef, useState } from 'react'
 import { UserProfile } from '../Auth/UserProfile'
 import { AutoSaveHandler } from './AutoSaveHandler'
+import { recordRoomVisit } from '../../lib/drawingStorage'
+import { useAuth } from '../../../Contexts/AuthContext'
 import { YjsSyncBridge, type Collaborator } from './YjsSyncBridge'
 import { CollaboratorCursors } from './CollaboratorCursors'
 import { CollaboratorList } from './CollaboratorList'
@@ -319,6 +321,7 @@ const ShapeRecognitionHandler = track(() => {
 })
 
 export function SketchlyCanvas() {
+  const { user } = useAuth()
   const [saveStatus, setSaveStatus] = useState<{
     isSaving: boolean
     lastSavedAt: Date | null
@@ -336,6 +339,13 @@ export function SketchlyCanvas() {
       setRoomId(urlRoomId)
     }
   }, [])
+
+  // Record room visit whenever roomId is established
+  useEffect(() => {
+    if (!roomId || !user?.id) return
+    const roomName = `Room ${roomId.slice(0, 8)}`
+    recordRoomVisit(user.id, roomId, roomName)
+  }, [roomId, user?.id])
 
   // When drawing is saved/loaded, use its ID as room ID
   const handleDrawingLoaded = (drawingId: string) => {
@@ -369,6 +379,7 @@ export function SketchlyCanvas() {
         <AutoSaveHandler
           onSaveStatusChange={setSaveStatus}
           onDrawingLoaded={handleDrawingLoaded}
+          roomId={roomId}
           debounceMs={5000}
         />
       </Tldraw>
