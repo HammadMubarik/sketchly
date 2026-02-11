@@ -15,28 +15,32 @@ export function CollaboratorList({ collaborators }: CollaboratorListProps) {
         left: '4.5rem',
         zIndex: 1000,
         display: 'flex',
-        gap: '4px',
       }}
     >
-      {collaborators.slice(0, 5).map((c) => (
+      {collaborators.slice(0, 5).map((c, i) => (
         <div
           key={c.id}
           style={{
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             borderRadius: '50%',
-            background: c.color,
-            border: '2px solid white',
+            background: `linear-gradient(135deg, ${c.color}, ${c.color}dd)`,
+            border: '2.5px solid white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            fontSize: '13px',
+            fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
             cursor: 'default',
+            marginLeft: i > 0 ? '-8px' : '0',
+            zIndex: 10 - i,
+            transition: 'transform 0.15s ease',
           }}
           title={c.name}
+          onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = 'scale(1.15) translateY(-2px)' }}
+          onMouseLeave={(e) => { (e.target as HTMLElement).style.transform = 'scale(1)' }}
         >
           {c.name[0]?.toUpperCase() || '?'}
         </div>
@@ -44,18 +48,19 @@ export function CollaboratorList({ collaborators }: CollaboratorListProps) {
       {collaborators.length > 5 && (
         <div
           style={{
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             borderRadius: '50%',
-            background: '#666',
-            border: '2px solid white',
+            background: 'linear-gradient(135deg, #6b7280, #4b5563)',
+            border: '2.5px solid white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            fontSize: '11px',
+            fontWeight: 700,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            marginLeft: '-8px',
           }}
         >
           +{collaborators.length - 5}

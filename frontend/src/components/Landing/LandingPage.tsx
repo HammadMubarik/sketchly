@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../../Contexts/AuthContext'
 import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar'
-import { LayoutDashboard, Plus, LogIn, LogOut, Settings, UserCog } from 'lucide-react'
+import { LayoutDashboard, Plus, LogIn, LogOut, Settings, UserCog, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { PreviousRooms } from './PreviousRooms'
@@ -52,7 +52,7 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
 
   return (
     <div className={cn(
-      "flex flex-col md:flex-row bg-gray-100 dark:bg-neutral-800 w-full overflow-hidden h-screen"
+      "flex flex-col md:flex-row bg-neutral-50 dark:bg-neutral-800 w-full overflow-hidden h-screen"
     )}>
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen}>
         <SidebarBody className="justify-between gap-10">
@@ -70,7 +70,7 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
                 label: user?.email?.split('@')[0] || 'User',
                 href: '#',
                 icon: (
-                  <div className="h-7 w-7 flex-shrink-0 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                  <div className="h-7 w-7 flex-shrink-0 rounded-full bg-neutral-900 flex items-center justify-center text-white text-xs font-bold shadow-md shadow-neutral-900/20">
                     {user?.email?.[0]?.toUpperCase() || 'U'}
                   </div>
                 ),
@@ -93,41 +93,79 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
         <div className="p-4 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col flex-1 w-full h-full">
           <div className="flex items-start justify-center flex-1 overflow-y-auto py-10">
             <div className="w-full max-w-lg">
-              <h1 className="text-4xl font-bold text-neutral-800 dark:text-white mb-2 text-center">
-                Sketchly
-              </h1>
-              <p className="text-neutral-500 dark:text-neutral-400 mb-10 text-center">
-                Collaborative UML diagramming with AI shape recognition
-              </p>
+              {/* Header with gradient */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="text-center mb-10"
+              >
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-medium mb-4 border border-neutral-200 dark:border-neutral-700">
+                  <Sparkles className="h-3 w-3" />
+                  AI-Powered Diagramming
+                </div>
+                <h1
+                  className="text-4xl font-extrabold mb-2 tracking-tight"
+                  style={{
+                    background: 'linear-gradient(135deg, #171717, #404040, #171717)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  Sketchly
+                </h1>
+                <p className="text-neutral-500 dark:text-neutral-400">
+                  Collaborative UML diagramming with AI shape recognition
+                </p>
+              </motion.div>
 
               {/* Create Room */}
-              <div className="mb-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="mb-8"
+              >
                 <button
                   onClick={onCreateRoom}
-                  className="w-full flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white py-4 px-6 rounded-xl text-lg font-semibold transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-3 bg-neutral-900 hover:bg-neutral-800 text-white py-4 px-6 rounded-xl text-lg font-semibold transition-all cursor-pointer hover:shadow-xl hover:shadow-neutral-900/25 active:scale-[0.98]"
+                  style={{ animation: 'pulse-glow 3s ease-in-out infinite' }}
                 >
                   <Plus className="h-6 w-6" />
                   Create New Room
                 </button>
-              </div>
+              </motion.div>
 
               {/* Divider */}
-              <div className="flex items-center mb-8">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="flex items-center mb-8"
+              >
                 <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-700" />
                 <span className="px-4 text-neutral-400 text-sm">or</span>
                 <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-700" />
-              </div>
+              </motion.div>
 
               {/* Join Room */}
-              <div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.25 }}
+              >
                 <h3 className="text-base font-semibold text-neutral-700 dark:text-neutral-200 mb-3 text-left">
                   Join Existing Room
                 </h3>
 
                 {error && (
-                  <div className="p-3 mb-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm text-left">
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 mb-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm text-left border border-red-200 dark:border-red-800"
+                  >
                     {error}
-                  </div>
+                  </motion.div>
                 )}
 
                 <div className="flex gap-3">
@@ -139,23 +177,29 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
                       setError(null)
                     }}
                     placeholder="Enter room ID..."
-                    className="flex-1 py-3 px-4 border-2 border-neutral-200 dark:border-neutral-700 rounded-xl text-base outline-none focus:border-indigo-500 dark:focus:border-indigo-400 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 transition-colors"
+                    className="flex-1 py-3 px-4 border-2 border-neutral-200 dark:border-neutral-700 rounded-xl text-base outline-none focus:border-neutral-900 dark:focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/10 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all placeholder:text-neutral-400"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleJoinRoom()
                     }}
                   />
                   <button
                     onClick={handleJoinRoom}
-                    className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-6 rounded-xl text-base font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-2 bg-neutral-900 hover:bg-neutral-800 active:bg-black text-white py-3 px-6 rounded-xl text-base font-semibold transition-all cursor-pointer hover:shadow-lg hover:shadow-neutral-900/25 active:scale-[0.98]"
                   >
                     <LogIn className="h-5 w-5" />
                     Join
                   </button>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Previous Rooms */}
-              <PreviousRooms onJoinRoom={onJoinRoom} />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.35 }}
+              >
+                <PreviousRooms onJoinRoom={onJoinRoom} />
+              </motion.div>
             </div>
           </div>
         </div>
@@ -170,11 +214,11 @@ const Logo = () => {
       href="#"
       className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
     >
-      <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
+      <div className="h-5 w-6 bg-neutral-900 rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
       <motion.span
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="font-medium text-black dark:text-white whitespace-pre"
+        className="font-semibold text-black dark:text-white whitespace-pre"
       >
         Sketchly
       </motion.span>
@@ -188,7 +232,7 @@ const LogoIcon = () => {
       href="#"
       className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
     >
-      <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
+      <div className="h-5 w-6 bg-neutral-900 rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
     </a>
   )
 }

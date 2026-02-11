@@ -3,17 +3,13 @@ interface ConnectionStatusProps {
 }
 
 export function ConnectionStatus({ status }: ConnectionStatusProps) {
-  const colors = {
-    connecting: '#f59e0b',
-    connected: '#10b981',
-    disconnected: '#ef4444',
+  const config = {
+    connecting: { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)', label: 'Connecting...' },
+    connected: { color: '#10b981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)', label: 'Live' },
+    disconnected: { color: '#ef4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.15)', label: 'Offline' },
   }
 
-  const labels = {
-    connecting: 'Connecting...',
-    connected: 'Live',
-    disconnected: 'Offline',
-  }
+  const { color, bg, border, label } = config[status]
 
   return (
     <div
@@ -24,27 +20,29 @@ export function ConnectionStatus({ status }: ConnectionStatusProps) {
         zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
-        gap: '0.5rem',
-        background: 'white',
-        padding: '0.5rem 0.75rem',
-        borderRadius: '4px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        gap: '0.4rem',
+        background: bg,
+        backdropFilter: 'blur(8px)',
+        padding: '0.4rem 0.75rem',
+        borderRadius: '9999px',
+        border: `1px solid ${border}`,
       }}
     >
       <div
         style={{
-          width: 8,
-          height: 8,
+          width: 7,
+          height: 7,
           borderRadius: '50%',
-          background: colors[status],
+          background: color,
+          boxShadow: `0 0 6px ${color}`,
           animation: status === 'connecting' ? 'pulse 1.5s infinite' : undefined,
         }}
       />
-      <span style={{ fontSize: '0.75rem', color: '#666' }}>{labels[status]}</span>
+      <span style={{ fontSize: '0.7rem', fontWeight: 500, color }}>{label}</span>
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+          50% { opacity: 0.4; }
         }
       `}</style>
     </div>

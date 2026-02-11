@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../../Contexts/AuthContext'
 import { Login } from '../Auth/Login'
 import { LandingPage } from '../Landing/LandingPage'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Loader2 } from 'lucide-react'
 
 type AppView = 'landing' | 'canvas'
 
@@ -59,8 +59,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-neutral-500">Loading...</div>
+      <div className="flex flex-col justify-center items-center min-h-screen bg-neutral-50 dark:bg-neutral-900 gap-3">
+        <Loader2 className="h-8 w-8 text-neutral-900 dark:text-neutral-200 animate-spin" />
+        <div className="text-neutral-400 text-sm font-medium">Loading...</div>
       </div>
     )
   }
@@ -77,7 +78,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     <>
       <button
         onClick={handleBackToLanding}
-        className="fixed top-4 left-4 z-[1001] flex items-center gap-2 bg-white text-neutral-700 py-2 px-4 rounded-lg border border-neutral-200 text-sm font-medium cursor-pointer shadow-sm hover:bg-neutral-50 transition-colors"
+        className="fixed top-4 left-4 z-[1001] flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-neutral-600 py-2 px-3.5 rounded-full border border-neutral-200/80 text-sm font-medium cursor-pointer shadow-sm hover:shadow-md hover:bg-white hover:text-neutral-800 transition-all active:scale-95"
       >
         <ChevronLeft className="h-4 w-4" />
         Home

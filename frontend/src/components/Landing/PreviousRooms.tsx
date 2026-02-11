@@ -2,7 +2,24 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../../Contexts/AuthContext'
 import { getUserRoomVisits, deleteRoomVisit } from '../../lib/drawingStorage'
 import type { RoomVisit } from '../../lib/drawingStorage'
-import { Clock, Trash2, ArrowRight } from 'lucide-react'
+import { Clock, Trash2, ArrowRight, Palette } from 'lucide-react'
+
+const ROOM_COLORS = [
+  'from-neutral-800 to-neutral-900',
+  'from-neutral-700 to-neutral-800',
+  'from-neutral-600 to-neutral-800',
+  'from-neutral-900 to-neutral-700',
+  'from-neutral-800 to-neutral-600',
+  'from-neutral-700 to-neutral-900',
+]
+
+function getRoomColor(id: string) {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return ROOM_COLORS[Math.abs(hash) % ROOM_COLORS.length]
+}
 
 interface PreviousRoomsProps {
   onJoinRoom: (roomId: string) => void
@@ -53,7 +70,11 @@ export function PreviousRooms({ onJoinRoom }: PreviousRoomsProps) {
         <h3 className="text-base font-semibold text-neutral-700 dark:text-neutral-200 mb-3 text-left">
           My Previous Rooms
         </h3>
-        <div className="text-neutral-400 text-sm">Loading...</div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 rounded-xl bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -67,32 +88,38 @@ export function PreviousRooms({ onJoinRoom }: PreviousRoomsProps) {
       <h3 className="text-base font-semibold text-neutral-700 dark:text-neutral-200 mb-3 text-left">
         My Previous Rooms
       </h3>
-      <div className="space-y-2 max-h-64 overflow-y-auto">
-        {visits.map((visit) => (
+      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+        {visits.map((visit, index) => (
           <button
             key={visit.id}
             onClick={() => onJoinRoom(visit.drawing_id)}
-            className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors cursor-pointer text-left group"
+            className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-all cursor-pointer text-left group hover:shadow-md hover:shadow-neutral-900/5"
+            style={{ animation: `fade-in-up 0.3s ease both ${index * 0.05}s` }}
           >
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate">
-                {visit.room_name}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${getRoomColor(visit.drawing_id)} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                <Palette className="h-4 w-4 text-white" />
               </div>
-              <div className="flex items-center gap-1 text-xs text-neutral-400">
-                <Clock className="h-3 w-3" />
-                {formatDate(visit.last_visited_at)}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate">
+                  {visit.room_name}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-neutral-400">
+                  <Clock className="h-3 w-3" />
+                  {formatDate(visit.last_visited_at)}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div
                 role="button"
                 onClick={(e) => handleDelete(e, visit.id)}
-                className="p-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
                 title="Remove from history"
               >
                 <Trash2 className="h-4 w-4" />
               </div>
-              <ArrowRight className="h-4 w-4 text-neutral-400 group-hover:text-indigo-500 transition-colors" />
+              <ArrowRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all" />
             </div>
           </button>
         ))}

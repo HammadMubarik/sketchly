@@ -4,7 +4,6 @@ import '@tldraw/tldraw/tldraw.css'
 import { cnnRecognizer } from '../../lib/cnnRecognizer'
 import type { Point } from '../../lib/cnnRecognizer'
 import { useEffect, useRef, useState } from 'react'
-import { UserProfile } from '../Auth/UserProfile'
 import { AutoSaveHandler } from './AutoSaveHandler'
 import { recordRoomVisit } from '../../lib/drawingStorage'
 import { useAuth } from '../../../Contexts/AuthContext'
@@ -28,20 +27,35 @@ function SaveStatusIndicator({
         bottom: '1rem',
         right: '1rem',
         zIndex: 1000,
-        background: 'white',
-        padding: '0.5rem 0.75rem',
-        borderRadius: '4px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        fontSize: '0.75rem',
-        color: '#666',
+        background: 'rgba(255,255,255,0.9)',
+        backdropFilter: 'blur(8px)',
+        padding: '0.4rem 0.75rem',
+        borderRadius: '9999px',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+        border: '1px solid rgba(0,0,0,0.06)',
+        fontSize: '0.7rem',
+        fontWeight: 500,
+        color: '#888',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
       }}
     >
       {isSaving ? (
-        <span>Saving...</span>
+        <>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
+          Saving...
+        </>
       ) : lastSavedAt ? (
-        <span>Saved {lastSavedAt.toLocaleTimeString()}</span>
+        <>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
+          Saved {lastSavedAt.toLocaleTimeString()}
+        </>
       ) : (
-        <span>Not saved yet</span>
+        <>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#d1d5db' }} />
+          Not saved yet
+        </>
       )}
     </div>
   )
@@ -359,7 +373,6 @@ export function SketchlyCanvas() {
 
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
-      <UserProfile />
       {roomId && <ShareButton roomId={roomId} />}
       <CollaboratorList collaborators={collaborators} />
       {roomId && <ConnectionStatus status={connectionStatus} />}
