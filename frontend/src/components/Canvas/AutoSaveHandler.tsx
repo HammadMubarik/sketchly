@@ -26,7 +26,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
   const isLoadedRef = useRef(false)
   const pendingSnapshotRef = useRef<TLEditorSnapshot | null>(null)
 
-  // Load existing drawing on mount
+  // Load existing drawing on mount (only for non-collaborative sessions)
   useEffect(() => {
     if (!user?.id || isLoadedRef.current) return
 
@@ -34,27 +34,17 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
       try {
         let existingDrawing = null
 
-        // If we have a roomId, load that specific drawing
+        // If we have a roomId, check if drawing exists (but don't load snapshot)
+        // Y.js will handle loading the collaborative state
         if (roomId) {
           existingDrawing = await getDrawingById(roomId)
-          console.log('Loading drawing by room ID:', roomId, existingDrawing ? 'found' : 'not found')
-        }
 
-        // No roomId means "Create New Room" — start with a blank canvas
-
-        if (existingDrawing) {
-          console.log('Loading existing drawing:', existingDrawing.id)
-          drawingIdRef.current = existingDrawing.id
-
-          editor.loadSnapshot(existingDrawing.snapshot)
-
-          onSaveStatusChange?.({
-            isSaving: false,
-            lastSavedAt: new Date(existingDrawing.updated_at),
-          })
-          onDrawingLoaded?.(existingDrawing.id)
-        } else {
-          console.log('No existing drawing found, starting fresh')
+          if (existingDrawing) {
+            // Just set the drawing ID, don't load snapshot
+            // Y.js will sync the collaborative state
+            drawingIdRef.current = existingDrawing.id
+            onDrawingLoaded?.(existingDrawing.id)
+          }
         }
 
         isLoadedRef.current = true
@@ -65,7 +55,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
     }
 
     loadDrawing()
-  }, [user?.id, editor, onSaveStatusChange, roomId])
+  }, [user?.id, editor, onSaveStatusChange, roomId, onDrawingLoaded])
 
   // Save function
   const performSave = async (snapshot: TLEditorSnapshot) => {

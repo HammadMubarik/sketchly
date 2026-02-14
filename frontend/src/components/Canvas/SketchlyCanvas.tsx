@@ -12,6 +12,7 @@ import { CollaboratorCursors } from './CollaboratorCursors'
 import { CollaboratorList } from './CollaboratorList'
 import { ConnectionStatus } from './ConnectionStatus'
 import { ShareButton } from './ShareButton'
+import { EditPermissionHandler } from './EditPermissionHandler'
 
 function SaveStatusIndicator({
   isSaving,
@@ -357,6 +358,7 @@ export function SketchlyCanvas() {
   // Record room visit whenever roomId is established
   useEffect(() => {
     if (!roomId || !user?.id) return
+
     const roomName = `Room ${roomId.slice(0, 8)}`
     recordRoomVisit(user.id, roomId, roomName)
   }, [roomId, user?.id])
@@ -387,6 +389,7 @@ export function SketchlyCanvas() {
               onConnectionStatusChange={setConnectionStatus}
             />
             <CollaboratorCursors collaborators={collaborators} />
+            <EditPermissionHandler roomId={roomId} collaborators={collaborators} />
           </>
         )}
         <AutoSaveHandler

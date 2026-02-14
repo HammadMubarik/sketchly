@@ -6,6 +6,7 @@ import { useAuth } from '../../../Contexts/AuthContext'
 
 export interface Collaborator {
   id: number
+  userId?: string
   name: string
   color: string
   cursor: { x: number; y: number; pageId?: string } | null
@@ -49,6 +50,7 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
     // Create Y.js store for this room
     const yjsStore = new YjsStore({
       roomId,
+      userId: user?.id,
       userName,
     })
     yjsStoreRef.current = yjsStore

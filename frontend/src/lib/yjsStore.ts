@@ -10,6 +10,7 @@ import { WebsocketProvider } from 'y-websocket'
 
 export interface YjsStoreConfig {
   roomId: string
+  userId?: string
   userName?: string
   userColor?: string
   websocketUrl?: string
@@ -44,6 +45,7 @@ export class YjsStore {
     this.awareness = this.provider.awareness
     this.awareness.setLocalState({
       user: {
+        id: config.userId,
         name: config.userName || 'Anonymous',
         color: config.userColor || this.getRandomColor(),
       },
@@ -133,18 +135,19 @@ export class YjsStore {
   getUsers() {
     const states = this.awareness.getStates()
     const users: any[] = []
-    
+
     states.forEach((state: any, clientId: number) => {
       if (state.user) {
         users.push({
           id: clientId,
+          userId: state.user.id,
           name: state.user.name,
           color: state.user.color,
           cursor: state.cursor,
         })
       }
     })
-    
+
     return users
   }
 

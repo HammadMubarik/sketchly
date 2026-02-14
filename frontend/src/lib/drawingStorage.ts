@@ -79,6 +79,7 @@ export interface RoomVisit {
   last_visited_at: string
   created_at: string
   owner_id?: string
+  can_edit?: boolean
 }
 
 export async function recordRoomVisit(
@@ -106,10 +107,7 @@ export async function recordRoomVisit(
 export async function getUserRoomVisits(userId: string): Promise<RoomVisit[]> {
   const { data, error } = await supabase
     .from('room_visits')
-    .select(`
-      *,
-      drawings!inner(user_id)
-    `)
+    .select('*, drawings!room_visits_drawing_id_fkey(user_id)')
     .eq('user_id', userId)
     .order('last_visited_at', { ascending: false })
     .limit(20)
@@ -140,4 +138,51 @@ export async function deleteRoomVisit(visitId: string): Promise<void> {
   if (error) {
     console.error('Error deleting room visit:', error)
   }
+}
+
+export async function getRoomUsers(drawingId: string): Promise<RoomVisit[]> {
+  const { data, error } = await supabase
+    .from('room_visits')
+    .select('*')
+    .eq('drawing_id', drawingId)
+    .order('last_visited_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching room users:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function updateUserEditPermission(
+  visitId: string,
+  canEdit: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('room_visits')
+    .update({ can_edit: canEdit })
+    .eq('id', visitId)
+
+  if (error) {
+    console.error('Error updating edit permission:', error)
+  }
+}
+
+export async function getUserEditPermission(
+  userId: string,
+  drawingId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('room_visits')
+    .select('can_edit')
+    .eq('user_id', userId)
+    .eq('drawing_id', drawingId)
+    .single()
+
+  if (error || !data) {
+    return true // Default to allowing edits
+  }
+
+  return data.can_edit ?? true
 }

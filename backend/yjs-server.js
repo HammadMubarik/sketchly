@@ -12,9 +12,9 @@ const PORT = process.env.YJS_PORT || 1234
 
 const wss = new WebSocketServer({ port: PORT })
 
-console.log(` Yjs WebSocket server running on ws://localhost:${PORT}`)
-console.log(' Waiting for connections...')
-console.log(' Clients will sync CRDTs through this server')
+console.log(`Yjs WebSocket server running on ws://localhost:${PORT}`)
+console.log('Waiting for connections...')
+console.log('Clients will sync CRDTs through this server')
 
 // Store active documents in memory
 const docs = new Map()
@@ -52,7 +52,7 @@ setInterval(() => {
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n Shutting down gracefully...')
+  console.log('\nShutting down gracefully...')
   wss.close(() => {
     console.log('Server closed')
     process.exit(0)
@@ -60,7 +60,7 @@ process.on('SIGINT', () => {
 })
 
 process.on('SIGTERM', () => {
-  console.log('\n👋 Shutting down gracefully...')
+  console.log('\nShutting down gracefully...')
   wss.close(() => {
     console.log('Server closed')
     process.exit(0)
