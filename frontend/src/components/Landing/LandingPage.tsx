@@ -10,7 +10,7 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
-  const { signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const [roomIdInput, setRoomIdInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -31,8 +31,16 @@ export function LandingPage({ onJoinRoom, onCreateRoom }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex flex-col">
-      {/* Header with Logout */}
-      <div className="w-full flex justify-end p-4">
+      {/* Header with User Info and Logout */}
+      <div className="w-full flex justify-between items-center p-4">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-full bg-neutral-900 flex items-center justify-center text-white text-sm font-bold">
+            {user?.email?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            {user?.email || 'User'}
+          </span>
+        </div>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer border border-neutral-200 dark:border-neutral-700"

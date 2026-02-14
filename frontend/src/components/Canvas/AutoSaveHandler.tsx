@@ -133,7 +133,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
             performSave(snapshot)
           }, debounceMs)
         },
-        { source: 'user', scope: 'document' }
+        { scope: 'document' } // Listen to ALL changes (local + remote collaborative changes)
       )
 
       return removeListener
