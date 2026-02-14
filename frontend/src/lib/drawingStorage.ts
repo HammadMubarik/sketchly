@@ -78,6 +78,7 @@ export interface RoomVisit {
   room_name: string
   last_visited_at: string
   created_at: string
+  owner_id?: string
 }
 
 export async function recordRoomVisit(
@@ -105,7 +106,10 @@ export async function recordRoomVisit(
 export async function getUserRoomVisits(userId: string): Promise<RoomVisit[]> {
   const { data, error } = await supabase
     .from('room_visits')
-    .select('*')
+    .select(`
+      *,
+      drawings!inner(user_id)
+    `)
     .eq('user_id', userId)
     .order('last_visited_at', { ascending: false })
     .limit(20)
@@ -115,7 +119,16 @@ export async function getUserRoomVisits(userId: string): Promise<RoomVisit[]> {
     return []
   }
 
-  return data || []
+  // Map the joined data to include owner_id
+  return (data || []).map((visit: any) => ({
+    id: visit.id,
+    user_id: visit.user_id,
+    drawing_id: visit.drawing_id,
+    room_name: visit.room_name,
+    last_visited_at: visit.last_visited_at,
+    created_at: visit.created_at,
+    owner_id: visit.drawings?.user_id,
+  }))
 }
 
 export async function deleteRoomVisit(visitId: string): Promise<void> {
