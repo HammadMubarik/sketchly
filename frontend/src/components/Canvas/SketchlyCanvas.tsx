@@ -13,6 +13,8 @@ import { CollaboratorList } from './CollaboratorList'
 import { ConnectionStatus } from './ConnectionStatus'
 import { ShareButton } from './ShareButton'
 import { EditPermissionHandler } from './EditPermissionHandler'
+import { ConnectionPoints } from './ConnectionPoints'
+import { getAnchorsForGeoType } from '../../lib/connectionPoints'
 
 function SaveStatusIndicator({
   isSaving,
@@ -135,7 +137,7 @@ const ShapeRecognitionHandler = track(() => {
             lastShapeIdRef.current = latestShape.id
 
             // Confidence threshold for shape recognition
-            const threshold = 0.20
+            const threshold = 0.55
             if (result.confidence <= threshold || result.name === 'unknown') {
               console.log(`Low confidence (${(result.confidence * 100).toFixed(1)}%), keeping hand-drawn shape`)
               return
@@ -148,62 +150,110 @@ const ShapeRecognitionHandler = track(() => {
             const centerY = bounds.y + bounds.height / 2
             const size = Math.max(Math.min(bounds.width, bounds.height), 40)
 
+            // Shared snap logic for arrows and lines
+            const allPageShapes = editor.getCurrentPageShapes()
+            const geoShapes = allPageShapes.filter(s => s.type === 'geo')
+            // Zoom-aware snap distance: 80 screen pixels converted to page coordinates
+            const zoom = editor.getZoomLevel()
+            const SNAP_DISTANCE = 80 / zoom
+
+            const findNearestSnap = (point: Point) => {
+              let bestShape: typeof geoShapes[0] | null = null
+              let bestAnchor = { x: 0.5, y: 0.5 }
+              let bestPagePos = { x: 0, y: 0 }
+              let minDistance = SNAP_DISTANCE
+
+              for (const shape of geoShapes) {
+                if (shape.id === latestShape.id) continue
+                const shapeBounds = editor.getShapePageBounds(shape)
+                if (!shapeBounds) continue
+
+                const geoType = (shape.props as any).geo as string
+                const anchors = getAnchorsForGeoType(geoType)
+                const pts = anchors.length > 0 ? anchors : [{ x: 0.5, y: 0.5 }]
+
+                for (const anchor of pts) {
+                  const px = shapeBounds.x + anchor.x * shapeBounds.width
+                  const py = shapeBounds.y + anchor.y * shapeBounds.height
+                  const distance = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
+
+                  if (distance < minDistance) {
+                    minDistance = distance
+                    bestShape = shape
+                    bestAnchor = anchor
+                    bestPagePos = { x: px, y: py }
+                  }
+                }
+              }
+
+              return bestShape ? { shape: bestShape, anchor: bestAnchor, pagePos: bestPagePos } : null
+            }
+
+            // Track newly created geo shape for auto-connection
+            let newGeoShapeId: TLShapeId | null = null
+
             try {
               switch (result.name) {
-                case 'rectangle':
+                case 'rectangle': {
+                  const id = createShapeId()
+                  newGeoShapeId = id
                   editor.createShapes([{
-                    id: createShapeId(),
+                    id,
                     type: 'geo',
                     x: bounds.x,
                     y: bounds.y,
                     props: { geo: 'rectangle', w: bounds.width, h: bounds.height },
                   }])
                   break
-                case 'square':
+                }
+                case 'square': {
+                  const id = createShapeId()
+                  newGeoShapeId = id
                   editor.createShapes([{
-                    id: createShapeId(),
+                    id,
                     type: 'geo',
                     x: centerX - size / 2,
                     y: centerY - size / 2,
                     props: { geo: 'rectangle', w: size, h: size },
                   }])
                   break
-                case 'circle':
+                }
+                case 'circle': {
+                  const id = createShapeId()
+                  newGeoShapeId = id
                   editor.createShapes([{
-                    id: createShapeId(),
+                    id,
                     type: 'geo',
                     x: centerX - size / 2,
                     y: centerY - size / 2,
                     props: { geo: 'ellipse', w: size, h: size },
                   }])
                   break
-                case 'triangle':
+                }
+                case 'triangle': {
+                  const id = createShapeId()
+                  newGeoShapeId = id
                   editor.createShapes([{
-                    id: createShapeId(),
+                    id,
                     type: 'geo',
                     x: bounds.x,
                     y: bounds.y,
                     props: { geo: 'triangle', w: bounds.width, h: bounds.height },
                   }])
                   break
-                case 'diamond':
+                }
+                case 'diamond': {
+                  const id = createShapeId()
+                  newGeoShapeId = id
                   editor.createShapes([{
-                    id: createShapeId(),
+                    id,
                     type: 'geo',
                     x: bounds.x,
                     y: bounds.y,
                     props: { geo: 'diamond', w: bounds.width, h: bounds.height },
                   }])
                   break
-                case 'star':
-                  editor.createShapes([{
-                    id: createShapeId(),
-                    type: 'geo',
-                    x: centerX - size / 2,
-                    y: centerY - size / 2,
-                    props: { geo: 'star', w: size, h: size },
-                  }])
-                  break
+                }
                 case 'arrow-left':
                 case 'arrow-right':
                 case 'arrow-up':
@@ -211,38 +261,14 @@ const ShapeRecognitionHandler = track(() => {
                   const first = points[0]
                   const last = points[points.length - 1]
 
-                  // Find nearby shapes to bind to
-                  const allPageShapes = editor.getCurrentPageShapes()
-                  const geoShapes = allPageShapes.filter(s => s.type === 'geo')
+                  const startSnap = findNearestSnap(first)
+                  const endSnap = findNearestSnap(last)
 
-                  const SNAP_DISTANCE = 50 // pixels
-
-                  // Helper function to find nearest shape to a point
-                  const findNearestShape = (point: Point) => {
-                    let nearestShape = null
-                    let minDistance = SNAP_DISTANCE
-
-                    for (const shape of geoShapes) {
-                      if (shape.id === latestShape.id) continue
-                      const shapeBounds = editor.getShapePageBounds(shape)
-                      if (!shapeBounds) continue
-
-                      // Calculate distance to shape center
-                      const centerX = shapeBounds.x + shapeBounds.width / 2
-                      const centerY = shapeBounds.y + shapeBounds.height / 2
-                      const distance = Math.sqrt((point.x - centerX) ** 2 + (point.y - centerY) ** 2)
-
-                      if (distance < minDistance) {
-                        minDistance = distance
-                        nearestShape = shape
-                      }
-                    }
-
-                    return nearestShape
-                  }
-
-                  const startShape = findNearestShape(first)
-                  const endShape = findNearestShape(last)
+                  // Use snap point page positions for arrow endpoints when available
+                  const startX = startSnap ? startSnap.pagePos.x - bounds.x : first.x - bounds.x
+                  const startY = startSnap ? startSnap.pagePos.y - bounds.y : first.y - bounds.y
+                  const endX = endSnap ? endSnap.pagePos.x - bounds.x : last.x - bounds.x
+                  const endY = endSnap ? endSnap.pagePos.y - bounds.y : last.y - bounds.y
 
                   const newArrowId = createShapeId()
                   editor.createShapes([{
@@ -251,8 +277,8 @@ const ShapeRecognitionHandler = track(() => {
                     x: bounds.x,
                     y: bounds.y,
                     props: {
-                      start: startShape ? { type: 'binding', boundShapeId: startShape.id, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false } : { x: first.x - bounds.x, y: first.y - bounds.y },
-                      end: endShape ? { type: 'binding', boundShapeId: endShape.id, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false } : { x: last.x - bounds.x, y: last.y - bounds.y },
+                      start: { x: startX, y: startY },
+                      end: { x: endX, y: endY },
                       arrowheadStart: 'none',
                       arrowheadEnd: 'arrow',
                       color: (latestShape.props && (latestShape.props as any).color) || undefined,
@@ -260,26 +286,98 @@ const ShapeRecognitionHandler = track(() => {
                     },
                   }])
 
-                  console.log(`Arrow binding: start=${startShape ? 'bound' : 'free'}, end=${endShape ? 'bound' : 'free'}`)
+                  // Create bindings to snap arrow endpoints to connection points
+                  if (startSnap) {
+                    try {
+
+                      editor.createBinding({
+                        type: 'arrow',
+                        fromId: newArrowId,
+                        toId: startSnap.shape.id,
+                        props: { terminal: 'start', normalizedAnchor: { x: startSnap.anchor.x, y: startSnap.anchor.y }, isExact: false, isPrecise: true },
+                      })
+
+                    } catch (e) { console.warn('Failed to bind arrow start:', e) }
+                  }
+                  if (endSnap) {
+                    try {
+                      editor.createBinding({
+                        type: 'arrow',
+                        fromId: newArrowId,
+                        toId: endSnap.shape.id,
+                        props: { terminal: 'end', normalizedAnchor: { x: endSnap.anchor.x, y: endSnap.anchor.y }, isExact: false, isPrecise: true },
+                      })
+                    } catch (e) { console.warn('Failed to bind arrow end:', e) }
+                  }
                   break
                 }
                 case 'line': {
                   const first = points[0]
                   const last = points[points.length - 1]
-                  editor.createShapes([{
-                    id: createShapeId(),
-                    type: 'line',
-                    x: bounds.x,
-                    y: bounds.y,
-                    props: {
-                      points: [
-                        { id: createShapeId(), index: 'a1' as any, x: first.x - bounds.x, y: first.y - bounds.y },
-                        { id: createShapeId(), index: 'a2' as any, x: last.x - bounds.x, y: last.y - bounds.y },
-                      ],
-                      color: (latestShape.props && (latestShape.props as any).color) || undefined,
-                      size: (latestShape.props && (latestShape.props as any).size) || undefined,
-                    },
-                  }])
+
+                  // Check if either endpoint is near a connection point
+                  const lineStartSnap = findNearestSnap(first)
+                  const lineEndSnap = findNearestSnap(last)
+
+                  if (lineStartSnap || lineEndSnap) {
+                    const lStartX = lineStartSnap ? lineStartSnap.pagePos.x - bounds.x : first.x - bounds.x
+                    const lStartY = lineStartSnap ? lineStartSnap.pagePos.y - bounds.y : first.y - bounds.y
+                    const lEndX = lineEndSnap ? lineEndSnap.pagePos.x - bounds.x : last.x - bounds.x
+                    const lEndY = lineEndSnap ? lineEndSnap.pagePos.y - bounds.y : last.y - bounds.y
+
+                    // Create a bound arrow (no arrowheads) instead of a plain line
+                    const lineArrowId = createShapeId()
+                    editor.createShapes([{
+                      id: lineArrowId,
+                      type: 'arrow',
+                      x: bounds.x,
+                      y: bounds.y,
+                      props: {
+                        start: { x: lStartX, y: lStartY },
+                        end: { x: lEndX, y: lEndY },
+                        arrowheadStart: 'none',
+                        arrowheadEnd: 'none',
+                        color: (latestShape.props && (latestShape.props as any).color) || undefined,
+                        size: (latestShape.props && (latestShape.props as any).size) || undefined,
+                      },
+                    }])
+
+                    if (lineStartSnap) {
+                      try {
+                        editor.createBinding({
+                          type: 'arrow',
+                          fromId: lineArrowId,
+                          toId: lineStartSnap.shape.id,
+                          props: { terminal: 'start', normalizedAnchor: { x: lineStartSnap.anchor.x, y: lineStartSnap.anchor.y }, isExact: false, isPrecise: true },
+                        })
+                      } catch (e) { console.warn('Failed to bind line start:', e) }
+                    }
+                    if (lineEndSnap) {
+                      try {
+                        editor.createBinding({
+                          type: 'arrow',
+                          fromId: lineArrowId,
+                          toId: lineEndSnap.shape.id,
+                          props: { terminal: 'end', normalizedAnchor: { x: lineEndSnap.anchor.x, y: lineEndSnap.anchor.y }, isExact: false, isPrecise: true },
+                        })
+                      } catch (e) { console.warn('Failed to bind line end:', e) }
+                    }
+                  } else {
+                    editor.createShapes([{
+                      id: createShapeId(),
+                      type: 'line',
+                      x: bounds.x,
+                      y: bounds.y,
+                      props: {
+                        points: [
+                          { id: createShapeId(), index: 'a1' as any, x: first.x - bounds.x, y: first.y - bounds.y },
+                          { id: createShapeId(), index: 'a2' as any, x: last.x - bounds.x, y: last.y - bounds.y },
+                        ],
+                        color: (latestShape.props && (latestShape.props as any).color) || undefined,
+                        size: (latestShape.props && (latestShape.props as any).size) || undefined,
+                      },
+                    }])
+                  }
                   break
                 }
                 default:
@@ -290,6 +388,63 @@ const ShapeRecognitionHandler = track(() => {
               // Delete original only after successful create
               editor.deleteShapes([latestShape.id])
               console.log('Shape converted successfully!')
+
+              // Auto-snap: if a new geo shape was created, check if any of its
+              // connection points are near connection points of existing shapes.
+              // If so, reposition the new shape so they touch exactly.
+              if (newGeoShapeId) {
+                const newShape = editor.getShape(newGeoShapeId)
+                if (newShape) {
+                  const newBounds = editor.getShapePageBounds(newShape)
+                  const newGeoType = (newShape.props as any).geo as string
+                  const newAnchors = getAnchorsForGeoType(newGeoType)
+
+                  if (newBounds && newAnchors.length > 0) {
+                    const existingGeoShapes = editor.getCurrentPageShapes()
+                      .filter(s => s.type === 'geo' && s.id !== newGeoShapeId)
+
+                    const AUTO_SNAP_DISTANCE = 60 / zoom
+
+                    // Find the closest pair of connection points between the new shape and any existing shape
+                    let bestMatch: { newAnchor: { x: number; y: number }; otherPx: number; otherPy: number; newPx: number; newPy: number; dist: number } | null = null
+
+                    for (const newAnchor of newAnchors) {
+                      const newPx = newBounds.x + newAnchor.x * newBounds.width
+                      const newPy = newBounds.y + newAnchor.y * newBounds.height
+
+                      for (const other of existingGeoShapes) {
+                        const otherBounds = editor.getShapePageBounds(other)
+                        if (!otherBounds) continue
+                        const otherAnchors = getAnchorsForGeoType((other.props as any).geo as string)
+                        if (otherAnchors.length === 0) continue
+
+                        for (const otherAnchor of otherAnchors) {
+                          const oPx = otherBounds.x + otherAnchor.x * otherBounds.width
+                          const oPy = otherBounds.y + otherAnchor.y * otherBounds.height
+                          const dist = Math.sqrt((newPx - oPx) ** 2 + (newPy - oPy) ** 2)
+
+                          if (dist < AUTO_SNAP_DISTANCE && (!bestMatch || dist < bestMatch.dist)) {
+                            bestMatch = { newAnchor, otherPx: oPx, otherPy: oPy, newPx, newPy, dist }
+                          }
+                        }
+                      }
+                    }
+
+                    if (bestMatch) {
+                      // Move the new shape so its connection point aligns exactly with the other shape's connection point
+                      const dx = bestMatch.otherPx - bestMatch.newPx
+                      const dy = bestMatch.otherPy - bestMatch.newPy
+                      editor.updateShape({
+                        id: newGeoShapeId,
+                        type: 'geo',
+                        x: newShape.x + dx,
+                        y: newShape.y + dy,
+                      })
+                      console.log(`Auto-snapped ${newGeoType} to align connection points`)
+                    }
+                  }
+                }
+              }
             } catch (createErr) {
               console.error('Error creating shape:', createErr)
               try { editor.undo() } catch { /* ignore */ }
@@ -381,6 +536,7 @@ export function SketchlyCanvas() {
       <SaveStatusIndicator isSaving={saveStatus.isSaving} lastSavedAt={saveStatus.lastSavedAt} />
       <Tldraw>
         <ShapeRecognitionHandler />
+        <ConnectionPoints />
         {roomId && (
           <>
             <YjsSyncBridge

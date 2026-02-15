@@ -123,5 +123,11 @@ nul
 .claude/
 settings.local.json
 
-# Model weights (large binary files)
-*.weights.bin
+# Python training artifacts
+training/best_model.keras
+training/__pycache__/
+*.keras
+
+# Python virtual environments
+venv/
+.venv/

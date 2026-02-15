@@ -2,9 +2,6 @@ import { useEffect } from 'react'
 import { SketchlyCanvas } from './components/Canvas/SketchlyCanvas'
 import { AuthProvider } from '../Contexts/AuthContext'
 import { ProtectedRoute } from './components/Auth/ProtectedRoute'
-// Import training function to make it available in console
-import './lib/trainInBrowser'
-
 function App() {
   useEffect(() => {
     // Preload CNN model on app startup
