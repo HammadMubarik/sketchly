@@ -16,6 +16,7 @@ import { EditPermissionHandler } from './EditPermissionHandler'
 import { ConnectionPoints } from './ConnectionPoints'
 import { getAnchorsForGeoType, getExternalAnchors, type ConnectionAnchor } from '../../lib/connectionPoints'
 import { UMLClassShapeUtil } from './UMLClassShapeUtil'
+import { findOrthogonalPath, type Obstacle, GRID_SIZE } from '../../lib/pathfinder'
 
 function SaveStatusIndicator({
   isSaving,
@@ -456,61 +457,51 @@ const ShapeRecognitionHandler = track(() => {
                         } catch (e) { console.warn('Failed to bind divider end:', e) }
                       }
                     }
-                  } else if (lineStartSnap || lineEndSnap) {
-                    const lStartX = lineStartSnap ? lineStartSnap.pagePos.x - bounds.x : first.x - bounds.x
-                    const lStartY = lineStartSnap ? lineStartSnap.pagePos.y - bounds.y : first.y - bounds.y
-                    const lEndX = lineEndSnap ? lineEndSnap.pagePos.x - bounds.x : last.x - bounds.x
-                    const lEndY = lineEndSnap ? lineEndSnap.pagePos.y - bounds.y : last.y - bounds.y
-
-                    // Create a bound arrow (no arrowheads) instead of a plain line
-                    const lineArrowId = createShapeId()
-                    editor.createShapes([{
-                      id: lineArrowId,
-                      type: 'arrow',
-                      x: bounds.x,
-                      y: bounds.y,
-                      props: {
-                        start: { x: lStartX, y: lStartY },
-                        end: { x: lEndX, y: lEndY },
-                        arrowheadStart: 'none',
-                        arrowheadEnd: 'none',
-                        dash: 'dotted',
-                        color: (latestShape.props && (latestShape.props as any).color) || undefined,
-                        size: (latestShape.props && (latestShape.props as any).size) || undefined,
-                      },
-                    }])
-
-                    if (lineStartSnap) {
-                      try {
-                        editor.createBinding({
-                          type: 'arrow',
-                          fromId: lineArrowId,
-                          toId: lineStartSnap.shape.id,
-                          props: { terminal: 'start', normalizedAnchor: { x: lineStartSnap.anchor.x, y: lineStartSnap.anchor.y }, isExact: false, isPrecise: true },
-                        })
-                      } catch (e) { console.warn('Failed to bind line start:', e) }
-                    }
-                    if (lineEndSnap) {
-                      try {
-                        editor.createBinding({
-                          type: 'arrow',
-                          fromId: lineArrowId,
-                          toId: lineEndSnap.shape.id,
-                          props: { terminal: 'end', normalizedAnchor: { x: lineEndSnap.anchor.x, y: lineEndSnap.anchor.y }, isExact: false, isPrecise: true },
-                        })
-                      } catch (e) { console.warn('Failed to bind line end:', e) }
-                    }
                   } else {
+                    // Build obstacles: include ALL shapes, but endpoint shapes get negative
+                    // padding so only their interior is blocked — border cells (connection
+                    // points) remain open, preventing the route from cutting through boxes.
+                    const endpointIds = new Set<TLShapeId>([
+                      lineStartSnap?.shape.id,
+                      lineEndSnap?.shape.id,
+                    ].filter(Boolean) as TLShapeId[])
+
+                    const lineObstacles: Obstacle[] = geoShapes
+                      .filter(s => s.id !== latestShape.id)
+                      .flatMap(s => {
+                        const b = editor.getShapePageBounds(s)
+                        if (!b) return []
+                        const isEndpoint = endpointIds.has(s.id)
+                        const obs: Obstacle = {
+                          x: b.x, y: b.y, width: b.width, height: b.height,
+                          ...(isEndpoint ? { padding: -GRID_SIZE } : {}),
+                        }
+                        return [obs]
+                      })
+
+                    const routeStart = lineStartSnap
+                      ? { x: lineStartSnap.pagePos.x, y: lineStartSnap.pagePos.y }
+                      : { x: first.x, y: first.y }
+                    const routeEnd = lineEndSnap
+                      ? { x: lineEndSnap.pagePos.x, y: lineEndSnap.pagePos.y }
+                      : { x: last.x, y: last.y }
+
+                    const route = findOrthogonalPath(routeStart, routeEnd, lineObstacles)
+
+                    // Position the line shape at the first waypoint; all points are relative to it
+                    const ox = route[0].x, oy = route[0].y
                     editor.createShapes([{
                       id: createShapeId(),
                       type: 'line',
-                      x: bounds.x,
-                      y: bounds.y,
+                      x: ox,
+                      y: oy,
                       props: {
-                        points: [
-                          { id: createShapeId(), index: 'a1' as any, x: first.x - bounds.x, y: first.y - bounds.y },
-                          { id: createShapeId(), index: 'a2' as any, x: last.x - bounds.x, y: last.y - bounds.y },
-                        ],
+                        points: route.map((pt, i) => ({
+                          id: createShapeId(),
+                          index: `a${i + 1}` as any,
+                          x: pt.x - ox,
+                          y: pt.y - oy,
+                        })),
                         dash: 'dotted',
                         color: (latestShape.props && (latestShape.props as any).color) || undefined,
                         size: (latestShape.props && (latestShape.props as any).size) || undefined,
