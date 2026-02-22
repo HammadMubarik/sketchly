@@ -1,19 +1,24 @@
 import { track, useEditor } from '@tldraw/tldraw'
-import { getAnchorsForGeoType } from '../../lib/connectionPoints'
+import { getAnchorsForGeoType, getExternalAnchors } from '../../lib/connectionPoints'
 
 export const ConnectionPoints = track(function ConnectionPoints() {
   const editor = useEditor()
   const shapes = editor.getCurrentPageShapes()
 
-  const geoShapes = shapes.filter(
-    (s) => s.type === 'geo' && (s.props as any).geo !== 'ellipse'
+  const relevantShapes = shapes.filter(
+    (s) =>
+      (s.type === 'geo' && (s.props as any).geo !== 'ellipse') ||
+      s.type === 'uml-class'
   )
 
   const points: { key: string; screenX: number; screenY: number }[] = []
 
-  for (const shape of geoShapes) {
-    const geoType = (shape.props as any).geo as string
-    const anchors = getAnchorsForGeoType(geoType)
+  for (const shape of relevantShapes) {
+    const anchors =
+      shape.type === 'uml-class'
+        ? getExternalAnchors()
+        : getAnchorsForGeoType((shape.props as any).geo as string)
+
     if (anchors.length === 0) continue
 
     const bounds = editor.getShapePageBounds(shape)

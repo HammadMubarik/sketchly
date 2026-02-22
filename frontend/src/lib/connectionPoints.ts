@@ -1,6 +1,7 @@
 export interface ConnectionAnchor {
   x: number // normalized 0-1
   y: number // normalized 0-1
+  internalOnly?: boolean // only snap from lines whose other end is inside this shape
 }
 
 const RECTANGLE_ANCHORS: ConnectionAnchor[] = [
@@ -34,4 +35,9 @@ export function getAnchorsForGeoType(geoType: string): ConnectionAnchor[] {
     default:
       return []
   }
+}
+
+/** External-only anchors for uml-class shapes (the 4 side midpoints). */
+export function getExternalAnchors(): ConnectionAnchor[] {
+  return RECTANGLE_ANCHORS
 }

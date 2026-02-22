@@ -14,7 +14,8 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { ShareButton } from './ShareButton'
 import { EditPermissionHandler } from './EditPermissionHandler'
 import { ConnectionPoints } from './ConnectionPoints'
-import { getAnchorsForGeoType } from '../../lib/connectionPoints'
+import { getAnchorsForGeoType, getExternalAnchors, type ConnectionAnchor } from '../../lib/connectionPoints'
+import { UMLClassShapeUtil } from './UMLClassShapeUtil'
 
 function SaveStatusIndicator({
   isSaving,
@@ -66,13 +67,29 @@ function SaveStatusIndicator({
 
 const ShapeRecognitionHandler = track(() => {
   const editor = useEditor()
-  const lastShapeIdRef = useRef<TLShapeId | null>(null)
   const processingRef = useRef(false)
+  const pendingRef = useRef(false)
 
   useEffect(() => {
+    // Delete any stale draw shapes left over from previous sessions.
+    // These are unconverted hand-drawn strokes that would otherwise be
+    // mis-processed when the user draws new shapes.
+    const staleDrawShapes = editor.getCurrentPageShapes().filter(s => s.type === 'draw')
+    if (staleDrawShapes.length > 0) {
+      editor.deleteShapes(staleDrawShapes.map(s => s.id))
+      console.log(`Cleaned up ${staleDrawShapes.length} stale draw shape(s) from previous session`)
+    }
+
+    // Track every shape ID that has been processed this session so we
+    // never accidentally re-process or skip the newest shape.
+    const processedIds = new Set<TLShapeId>()
+
     const handlePointerUp = () => {
+      if (pendingRef.current) return  // already a recognition queued, skip duplicate
+      pendingRef.current = true
       // Small delay to let tldraw finish creating the shape
       setTimeout(() => {
+        pendingRef.current = false
         if (processingRef.current) return
         processingRef.current = true
 
@@ -83,8 +100,13 @@ const ShapeRecognitionHandler = track(() => {
 
             if (drawShapes.length === 0) return
 
-            const latestShape = drawShapes[drawShapes.length - 1]
-            if (latestShape.id === lastShapeIdRef.current) return
+            // Pick the newest unprocessed draw shape (tldraw fractional index
+            // is lexicographically ordered by creation time).
+            const unprocessed = drawShapes.filter(s => !processedIds.has(s.id))
+            if (unprocessed.length === 0) return
+            const latestShape = unprocessed.reduce((a: any, b: any) =>
+              a.index > b.index ? a : b
+            )
 
             console.log('New shape drawn, analyzing...')
 
@@ -108,15 +130,30 @@ const ShapeRecognitionHandler = track(() => {
 
             console.log(`Analyzing ${points.length} points with CNN...`)
             let result = { name: 'unknown', confidence: 0 }
+            const threshold = 0.55
 
+            // Try CNN first (with 10s timeout to prevent silent TF.js hangs)
+            let cnnConfident = false
             try {
-              // Try CNN recognizer first
-              result = await cnnRecognizer.recognize(points)
-              console.log(`CNN Detected: ${result.name} (${(result.confidence * 100).toFixed(1)}% confidence)`)
+              const cnnResult = await Promise.race([
+                cnnRecognizer.recognize(points),
+                new Promise<never>((_, rej) =>
+                  setTimeout(() => rej(new Error('CNN timeout')), 10_000)
+                ),
+              ])
+              console.log(`CNN Detected: ${cnnResult.name} (${(cnnResult.confidence * 100).toFixed(1)}% confidence)`)
+              if (cnnResult.confidence > threshold) {
+                result = cnnResult
+                cnnConfident = true
+              } else {
+                console.log(`CNN below threshold, trying backend API...`)
+              }
             } catch (cnnError) {
-              console.error('CNN recognition failed, falling back to backend API:', cnnError)
+              console.error('CNN recognition failed, trying backend API:', cnnError)
+            }
 
-              // Fallback to backend API
+            // Fall back to backend API when CNN throws OR returns low confidence
+            if (!cnnConfident) {
               try {
                 const apiBase = window.location.port === '5173' ? 'http://localhost:5000' : ''
                 const resp = await fetch(apiBase + '/api/recognize', {
@@ -129,15 +166,56 @@ const ShapeRecognitionHandler = track(() => {
                   console.log(`Backend API Detected: ${result.name} (${(result.confidence * 100).toFixed(1)}%)`)
                 }
               } catch (apiErr) {
-                console.error('All recognition methods failed:', apiErr)
-                return
+                console.error('Backend API also failed:', apiErr)
               }
             }
 
-            lastShapeIdRef.current = latestShape.id
+            // Geometric corner-count correction for borderline CNN results.
+            // Counts significant direction changes in the stroke to determine
+            // how many corners the shape has (3 = triangle, 4 = rectangle/square).
+            if (result.confidence < 0.78) {
+              const stride = Math.max(1, Math.floor(points.length / 40))
+              const subs: Point[] = []
+              for (let i = 0; i < points.length; i += stride) subs.push(points[i])
+              const WIN = 3
+              let corners = 0
+              let lastCorner = -WIN * 4
+              for (let i = WIN; i < subs.length - WIN; i++) {
+                const dx1 = subs[i].x - subs[i - WIN].x
+                const dy1 = subs[i].y - subs[i - WIN].y
+                const dx2 = subs[i + WIN].x - subs[i].x
+                const dy2 = subs[i + WIN].y - subs[i].y
+                const len1 = Math.hypot(dx1, dy1)
+                const len2 = Math.hypot(dx2, dy2)
+                if (len1 < 2 || len2 < 2) continue
+                const cos = (dx1 * dx2 + dy1 * dy2) / (len1 * len2)
+                const angle = Math.acos(Math.max(-1, Math.min(1, cos)))
+                if (angle > Math.PI * 0.33 && i - lastCorner > WIN * 3) {
+                  corners++
+                  lastCorner = i
+                }
+              }
+              console.log(`Geometric corner count: ${corners}`)
 
-            // Confidence threshold for shape recognition
-            const threshold = 0.55
+              const xs = points.map(p => p.x)
+              const ys = points.map(p => p.y)
+              const geoW = Math.max(...xs) - Math.min(...xs)
+              const geoH = Math.max(...ys) - Math.min(...ys)
+              const aspect = geoW / Math.max(geoH, 1)
+
+              if (corners >= 4 && (result.name === 'triangle' || result.name === 'line' || result.name === 'unknown')) {
+                const corrected = aspect > 1.4 ? 'rectangle' : 'square'
+                console.log(`Geometric correction: ${corners} corners → ${corrected} (was ${result.name})`)
+                result = { ...result, name: corrected, confidence: 0.72 }
+              } else if (corners <= 3 && corners >= 2 && (result.name === 'rectangle' || result.name === 'square')) {
+                console.log(`Geometric correction: ${corners} corners → triangle (was ${result.name})`)
+                result = { ...result, name: 'triangle', confidence: 0.72 }
+              }
+            }
+
+            // Mark as processed regardless of outcome to prevent infinite retry loops
+            processedIds.add(latestShape.id)
+
             if (result.confidence <= threshold || result.name === 'unknown') {
               console.log(`Low confidence (${(result.confidence * 100).toFixed(1)}%), keeping hand-drawn shape`)
               return
@@ -152,14 +230,14 @@ const ShapeRecognitionHandler = track(() => {
 
             // Shared snap logic for arrows and lines
             const allPageShapes = editor.getCurrentPageShapes()
-            const geoShapes = allPageShapes.filter(s => s.type === 'geo')
+            const geoShapes = allPageShapes.filter(s => s.type === 'geo' || s.type === 'uml-class')
             // Zoom-aware snap distance: 80 screen pixels converted to page coordinates
             const zoom = editor.getZoomLevel()
             const SNAP_DISTANCE = 80 / zoom
 
-            const findNearestSnap = (point: Point) => {
+            const findNearestSnap = (point: Point, otherPoint?: Point, allowInternal = false) => {
               let bestShape: typeof geoShapes[0] | null = null
-              let bestAnchor = { x: 0.5, y: 0.5 }
+              let bestAnchor: ConnectionAnchor = { x: 0.5, y: 0.5 }
               let bestPagePos = { x: 0, y: 0 }
               let minDistance = SNAP_DISTANCE
 
@@ -168,11 +246,28 @@ const ShapeRecognitionHandler = track(() => {
                 const shapeBounds = editor.getShapePageBounds(shape)
                 if (!shapeBounds) continue
 
-                const geoType = (shape.props as any).geo as string
-                const anchors = getAnchorsForGeoType(geoType)
+                const anchors = shape.type === 'uml-class'
+                  ? getExternalAnchors()
+                  : getAnchorsForGeoType((shape.props as any).geo as string)
                 const pts = anchors.length > 0 ? anchors : [{ x: 0.5, y: 0.5 }]
 
+                const pointInsideShape = (p: Point) =>
+                  p.x >= shapeBounds.x &&
+                  p.x <= shapeBounds.x + shapeBounds.width &&
+                  p.y >= shapeBounds.y &&
+                  p.y <= shapeBounds.y + shapeBounds.height
+
                 for (const anchor of pts) {
+                  if (anchor.internalOnly) {
+                    // Internal anchors: only for lines where the other endpoint is inside this shape
+                    if (!allowInternal) continue
+                    if (!otherPoint || !pointInsideShape(otherPoint)) continue
+                  } else {
+                    // Regular anchors: skip entirely when the current point is inside the shape
+                    // (prevents internal lines from snapping to external midpoints)
+                    if (allowInternal && pointInsideShape(point)) continue
+                  }
+
                   const px = shapeBounds.x + anchor.x * shapeBounds.width
                   const py = shapeBounds.y + anchor.y * shapeBounds.height
                   const distance = Math.sqrt((point.x - px) ** 2 + (point.y - py) ** 2)
@@ -199,10 +294,10 @@ const ShapeRecognitionHandler = track(() => {
                   newGeoShapeId = id
                   editor.createShapes([{
                     id,
-                    type: 'geo',
+                    type: 'uml-class',
                     x: bounds.x,
                     y: bounds.y,
-                    props: { geo: 'rectangle', w: bounds.width, h: bounds.height },
+                    props: { w: bounds.width, h: bounds.height, topText: '', middleText: '', bottomText: '' },
                   }])
                   break
                 }
@@ -211,10 +306,10 @@ const ShapeRecognitionHandler = track(() => {
                   newGeoShapeId = id
                   editor.createShapes([{
                     id,
-                    type: 'geo',
+                    type: 'uml-class',
                     x: centerX - size / 2,
                     y: centerY - size / 2,
-                    props: { geo: 'rectangle', w: size, h: size },
+                    props: { w: size, h: size, topText: '', middleText: '', bottomText: '' },
                   }])
                   break
                 }
@@ -315,11 +410,52 @@ const ShapeRecognitionHandler = track(() => {
                   const first = points[0]
                   const last = points[points.length - 1]
 
-                  // Check if either endpoint is near a connection point
-                  const lineStartSnap = findNearestSnap(first)
-                  const lineEndSnap = findNearestSnap(last)
+                  const lineStartSnap = findNearestSnap(first, last, true)
+                  const lineEndSnap = findNearestSnap(last, first, true)
 
-                  if (lineStartSnap || lineEndSnap) {
+                  // If both endpoints snapped to internalOnly anchors on the same shape,
+                  // create ALL internal divider lines at once (UML compartment behavior)
+                  const isInternalLine =
+                    lineStartSnap?.anchor.internalOnly &&
+                    lineEndSnap?.anchor.internalOnly &&
+                    lineStartSnap.shape.id === lineEndSnap.shape.id
+
+                  if (isInternalLine && lineStartSnap && lineEndSnap) {
+                    const targetShape = lineStartSnap.shape
+                    const targetBounds = editor.getShapePageBounds(targetShape)
+                    if (targetBounds) {
+                      const allAnchors = getAnchorsForGeoType((targetShape.props as any).geo as string)
+                      const internalYValues = [...new Set(allAnchors.filter(a => a.internalOnly).map(a => a.y))]
+
+                      for (const yVal of internalYValues) {
+                        const dividerLineId = createShapeId()
+                        editor.createShapes([{
+                          id: dividerLineId,
+                          type: 'arrow',
+                          x: targetBounds.x,
+                          y: targetBounds.y + yVal * targetBounds.height,
+                          props: {
+                            start: { x: 0, y: 0 },
+                            end: { x: targetBounds.width, y: 0 },
+                            arrowheadStart: 'none',
+                            arrowheadEnd: 'none',
+                          },
+                        }])
+                        try {
+                          editor.createBinding({
+                            type: 'arrow', fromId: dividerLineId, toId: targetShape.id,
+                            props: { terminal: 'start', normalizedAnchor: { x: 0, y: yVal }, isExact: false, isPrecise: true },
+                          })
+                        } catch (e) { console.warn('Failed to bind divider start:', e) }
+                        try {
+                          editor.createBinding({
+                            type: 'arrow', fromId: dividerLineId, toId: targetShape.id,
+                            props: { terminal: 'end', normalizedAnchor: { x: 1, y: yVal }, isExact: false, isPrecise: true },
+                          })
+                        } catch (e) { console.warn('Failed to bind divider end:', e) }
+                      }
+                    }
+                  } else if (lineStartSnap || lineEndSnap) {
                     const lStartX = lineStartSnap ? lineStartSnap.pagePos.x - bounds.x : first.x - bounds.x
                     const lStartY = lineStartSnap ? lineStartSnap.pagePos.y - bounds.y : first.y - bounds.y
                     const lEndX = lineEndSnap ? lineEndSnap.pagePos.x - bounds.x : last.x - bounds.x
@@ -396,12 +532,13 @@ const ShapeRecognitionHandler = track(() => {
                 const newShape = editor.getShape(newGeoShapeId)
                 if (newShape) {
                   const newBounds = editor.getShapePageBounds(newShape)
-                  const newGeoType = (newShape.props as any).geo as string
-                  const newAnchors = getAnchorsForGeoType(newGeoType)
+                  const newAnchors = newShape.type === 'uml-class'
+                    ? getExternalAnchors()
+                    : getAnchorsForGeoType((newShape.props as any).geo as string)
 
                   if (newBounds && newAnchors.length > 0) {
                     const existingGeoShapes = editor.getCurrentPageShapes()
-                      .filter(s => s.type === 'geo' && s.id !== newGeoShapeId)
+                      .filter(s => (s.type === 'geo' || s.type === 'uml-class') && s.id !== newGeoShapeId)
 
                     const AUTO_SNAP_DISTANCE = 60 / zoom
 
@@ -415,7 +552,9 @@ const ShapeRecognitionHandler = track(() => {
                       for (const other of existingGeoShapes) {
                         const otherBounds = editor.getShapePageBounds(other)
                         if (!otherBounds) continue
-                        const otherAnchors = getAnchorsForGeoType((other.props as any).geo as string)
+                        const otherAnchors = other.type === 'uml-class'
+                          ? getExternalAnchors()
+                          : getAnchorsForGeoType((other.props as any).geo as string)
                         if (otherAnchors.length === 0) continue
 
                         for (const otherAnchor of otherAnchors) {
@@ -436,11 +575,10 @@ const ShapeRecognitionHandler = track(() => {
                       const dy = bestMatch.otherPy - bestMatch.newPy
                       editor.updateShape({
                         id: newGeoShapeId,
-                        type: 'geo',
+                        type: newShape.type as any,
                         x: newShape.x + dx,
                         y: newShape.y + dy,
                       })
-                      console.log(`Auto-snapped ${newGeoType} to align connection points`)
                     }
                   }
                 }
@@ -458,20 +596,20 @@ const ShapeRecognitionHandler = track(() => {
       }, 100) // Short delay to ensure shape is fully created
     }
 
-    // Listen for pointerup on the window (fires when user releases the mouse/finger).
-    // Using the store listener caused premature triggers while the user was still
-    // holding the mouse button (selectedShapes can be empty mid-draw). The global
-    // pointerup ensures we only try to finalize recognition when the user actually releases.
+    // Listen for pointerup anywhere on the window.
+    // We do NOT gate on getCurrentToolId() === 'draw' because tldraw often switches
+    // the tool back to select synchronously before the window listener fires, causing
+    // the check to fail and leaving shapes un-converted. The early-exit guards inside
+    // handlePointerUp (drawShapes.length === 0, processedIds, pendingRef) are
+    // sufficient to prevent false triggers.
     const onWindowPointerUp = () => {
-      // Only act if the drawing tool is active; otherwise ignore
-      if (editor.getCurrentToolId && editor.getCurrentToolId() === 'draw') {
-        handlePointerUp()
-      }
+      handlePointerUp()
     }
 
     window.addEventListener('pointerup', onWindowPointerUp)
 
-    // Also listen for tool changes
+    // Backup: also trigger when the tool explicitly leaves draw mode
+    // (covers edge cases where pointerup fires but the draw shape isn't committed yet)
     let lastToolId = editor.getCurrentToolId()
     const toolCheckInterval = setInterval(() => {
       const currentToolId = editor.getCurrentToolId()
@@ -534,7 +672,7 @@ export function SketchlyCanvas() {
       <CollaboratorList collaborators={collaborators} />
       {roomId && <ConnectionStatus status={connectionStatus} />}
       <SaveStatusIndicator isSaving={saveStatus.isSaving} lastSavedAt={saveStatus.lastSavedAt} />
-      <Tldraw>
+      <Tldraw shapeUtils={[UMLClassShapeUtil]}>
         <ShapeRecognitionHandler />
         <ConnectionPoints />
         {roomId && (
