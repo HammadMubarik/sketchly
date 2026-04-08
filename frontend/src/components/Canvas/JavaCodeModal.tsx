@@ -5,8 +5,53 @@ interface JavaCodeModalProps {
   onClose: () => void
 }
 
-function parseJavaFiles(code: string): { name: string; content: string }[] {
-  const pattern = /(?:public\s+)?(?:class|interface|enum)\s+(\w+)/g
+// Strip markdown code fences Claude sometimes wraps output in
+function stripMarkdown(code: string): string {
+  return code
+    .replace(/^```[a-zA-Z]*\n?/gm, '')
+    .replace(/^```\s*$/gm, '')
+    .trim()
+}
+
+// Known Java types that need imports
+const IMPORT_MAP: Record<string, string> = {
+  Date: 'java.util.Date',
+  List: 'java.util.List',
+  ArrayList: 'java.util.ArrayList',
+  Map: 'java.util.Map',
+  HashMap: 'java.util.HashMap',
+  Set: 'java.util.Set',
+  HashSet: 'java.util.HashSet',
+  LinkedList: 'java.util.LinkedList',
+  LocalDate: 'java.time.LocalDate',
+  LocalDateTime: 'java.time.LocalDateTime',
+  Optional: 'java.util.Optional',
+}
+
+function addMissingImports(content: string): string {
+  const needed: string[] = []
+  for (const [type, importPath] of Object.entries(IMPORT_MAP)) {
+    const used = new RegExp(`\\b${type}\\b`).test(content)
+    const alreadyImported = content.includes(`import ${importPath}`)
+    if (used && !alreadyImported) {
+      needed.push(`import ${importPath};`)
+    }
+  }
+  if (needed.length === 0) return content
+  return needed.join('\n') + '\n\n' + content
+}
+
+function ensurePublic(content: string): string {
+  // Add `public` to top-level class/interface/enum if missing
+  return content.replace(
+    /^(?!public\s)((?:abstract\s+)?(?:class|interface|enum)\s+\w+)/m,
+    'public $1'
+  )
+}
+
+function parseJavaFiles(raw: string): { name: string; content: string }[] {
+  const code = stripMarkdown(raw)
+  const pattern = /(?:public\s+)?(?:abstract\s+)?(?:class|interface|enum)\s+(\w+)/g
   const matches = [...code.matchAll(pattern)]
 
   if (matches.length === 0) return [{ name: 'Main.java', content: code }]
@@ -14,7 +59,8 @@ function parseJavaFiles(code: string): { name: string; content: string }[] {
   return matches.map((m, i) => {
     const start = m.index!
     const end = matches[i + 1]?.index ?? code.length
-    return { name: `${m[1]}.java`, content: code.slice(start, end).trim() }
+    const content = ensurePublic(addMissingImports(code.slice(start, end).trim()))
+    return { name: `${m[1]}.java`, content }
   })
 }
 
@@ -22,8 +68,10 @@ export function JavaCodeModal({ code, onClose }: JavaCodeModalProps) {
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  const displayCode = stripMarkdown(code)
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(code)
+    navigator.clipboard.writeText(displayCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -95,7 +143,7 @@ export function JavaCodeModal({ code, onClose }: JavaCodeModalProps) {
             wordBreak: 'break-word',
           }}
         >
-          {code}
+          {displayCode}
         </pre>
 
         <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #313244', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
