@@ -79,7 +79,6 @@ const ShapeRecognitionHandler = track(() => {
     const staleDrawShapes = editor.getCurrentPageShapes().filter(s => s.type === 'draw')
     if (staleDrawShapes.length > 0) {
       editor.deleteShapes(staleDrawShapes.map(s => s.id))
-      console.log(`Cleaned up ${staleDrawShapes.length} stale draw shape(s) from previous session`)
     }
 
     // Track every shape ID that has been processed this session so we
@@ -110,8 +109,6 @@ const ShapeRecognitionHandler = track(() => {
               a.index > b.index ? a : b
             )
 
-            console.log('New shape drawn, analyzing...')
-
             const points: Point[] = []
             const shapeProps = latestShape.props as any
             const segments = shapeProps.segments
@@ -125,12 +122,8 @@ const ShapeRecognitionHandler = track(() => {
               }
             }
 
-            if (points.length < 10) {
-              console.log(`Not enough points (${points.length}), need at least 10`)
-              return
-            }
+            if (points.length < 10) return
 
-            console.log(`Analyzing ${points.length} points with CNN...`)
             let result = { name: 'unknown', confidence: 0 }
             const threshold = 0.55
 
@@ -143,12 +136,9 @@ const ShapeRecognitionHandler = track(() => {
                   setTimeout(() => rej(new Error('CNN timeout')), 10_000)
                 ),
               ])
-              console.log(`CNN Detected: ${cnnResult.name} (${(cnnResult.confidence * 100).toFixed(1)}% confidence)`)
               if (cnnResult.confidence > threshold) {
                 result = cnnResult
                 cnnConfident = true
-              } else {
-                console.log(`CNN below threshold, trying backend API...`)
               }
             } catch (cnnError) {
               console.error('CNN recognition failed, trying backend API:', cnnError)
@@ -165,7 +155,6 @@ const ShapeRecognitionHandler = track(() => {
                 })
                 if (resp.ok) {
                   result = await resp.json()
-                  console.log(`Backend API Detected: ${result.name} (${(result.confidence * 100).toFixed(1)}%)`)
                 }
               } catch (apiErr) {
                 console.error('Backend API also failed:', apiErr)
@@ -197,8 +186,6 @@ const ShapeRecognitionHandler = track(() => {
                   lastCorner = i
                 }
               }
-              console.log(`Geometric corner count: ${corners}`)
-
               const xs = points.map(p => p.x)
               const ys = points.map(p => p.y)
               const geoW = Math.max(...xs) - Math.min(...xs)
@@ -207,10 +194,8 @@ const ShapeRecognitionHandler = track(() => {
 
               if (corners >= 4 && (result.name === 'triangle' || result.name === 'line' || result.name === 'unknown')) {
                 const corrected = aspect > 1.4 ? 'rectangle' : 'square'
-                console.log(`Geometric correction: ${corners} corners → ${corrected} (was ${result.name})`)
                 result = { ...result, name: corrected, confidence: 0.72 }
               } else if (corners <= 3 && corners >= 2 && (result.name === 'rectangle' || result.name === 'square')) {
-                console.log(`Geometric correction: ${corners} corners → triangle (was ${result.name})`)
                 result = { ...result, name: 'triangle', confidence: 0.72 }
               }
             }
@@ -218,10 +203,7 @@ const ShapeRecognitionHandler = track(() => {
             // Mark as processed regardless of outcome to prevent infinite retry loops
             processedIds.add(latestShape.id)
 
-            if (result.confidence <= threshold || result.name === 'unknown') {
-              console.log(`Low confidence (${(result.confidence * 100).toFixed(1)}%), keeping hand-drawn shape`)
-              return
-            }
+            if (result.confidence <= threshold || result.name === 'unknown') return
 
             const bounds = editor.getShapePageBounds(latestShape)
             if (!bounds) return
@@ -512,13 +494,10 @@ const ShapeRecognitionHandler = track(() => {
                   break
                 }
                 default:
-                  console.log(`Unknown shape type: ${result.name}, keeping original`)
-                  return // Don't delete the original shape
+                  return
               }
 
-              // Delete original only after successful create
               editor.deleteShapes([latestShape.id])
-              console.log('Shape converted successfully!')
 
               // Auto-snap: if a new geo shape was created, check if any of its
               // connection points are near connection points of existing shapes.
