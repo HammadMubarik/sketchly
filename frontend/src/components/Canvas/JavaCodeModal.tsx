@@ -29,16 +29,22 @@ const IMPORT_MAP: Record<string, string> = {
 }
 
 function addMissingImports(content: string): string {
+  // Strip existing imports first to avoid double-detecting them
+  const existingImports = content.match(/^import .+;$/gm) ?? []
+  const bodyOnly = content.replace(/^import .+;$/gm, '').trim()
+
   const needed: string[] = []
   for (const [type, importPath] of Object.entries(IMPORT_MAP)) {
-    const used = new RegExp(`\\b${type}\\b`).test(content)
-    const alreadyImported = content.includes(`import ${importPath}`)
+    const used = new RegExp(`\\b${type}\\b`).test(bodyOnly)
+    const alreadyImported = existingImports.some(i => i.includes(importPath))
     if (used && !alreadyImported) {
       needed.push(`import ${importPath};`)
     }
   }
-  if (needed.length === 0) return content
-  return needed.join('\n') + '\n\n' + content
+
+  const allImports = [...existingImports, ...needed]
+  if (allImports.length === 0) return content
+  return allImports.join('\n') + '\n\n' + bodyOnly
 }
 
 function ensurePublic(content: string): string {
