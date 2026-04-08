@@ -83,20 +83,40 @@ export function JavaCodeModal({ code, onClose }: JavaCodeModalProps) {
   }
 
   const handleSaveFiles = async () => {
-    try {
-      const dirHandle = await (window as any).showDirectoryPicker()
-      const files = parseJavaFiles(code)
-      for (const file of files) {
-        const fileHandle = await dirHandle.getFileHandle(file.name, { create: true })
-        const writable = await fileHandle.createWritable()
-        await writable.write(file.content)
-        await writable.close()
+    const files = parseJavaFiles(code)
+
+    // Chrome/Edge: use File System Access API to write into a chosen folder
+    if ('showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker()
+        for (const file of files) {
+          const fileHandle = await dirHandle.getFileHandle(file.name, { create: true })
+          const writable = await fileHandle.createWritable()
+          await writable.write(file.content)
+          await writable.close()
+        }
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      } catch (err: any) {
+        if (err.name !== 'AbortError') console.error('Save failed:', err)
       }
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (err: any) {
-      if (err.name !== 'AbortError') console.error('Save failed:', err)
+      return
     }
+
+    // Firefox fallback: download each file individually
+    for (const file of files) {
+      const blob = new Blob([file.content], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      a.click()
+      URL.revokeObjectURL(url)
+      // Small delay between downloads so Firefox doesn't block them
+      await new Promise(r => setTimeout(r, 200))
+    }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
   return (
