@@ -13,6 +13,22 @@ function stripMarkdown(code: string): string {
     .trim()
 }
 
+// Hoist all import statements to the top of the code
+function hoistImports(code: string): string {
+  const lines = code.split('\n')
+  const imports: string[] = []
+  const rest: string[] = []
+  for (const line of lines) {
+    if (/^\s*import\s+[\w.]+;/.test(line)) {
+      imports.push(line.trim())
+    } else {
+      rest.push(line)
+    }
+  }
+  if (imports.length === 0) return code
+  return [...imports, '', ...rest].join('\n').trimStart()
+}
+
 // Known Java types that need imports
 const IMPORT_MAP: Record<string, string> = {
   Date: 'java.util.Date',
@@ -74,7 +90,7 @@ export function JavaCodeModal({ code, onClose }: JavaCodeModalProps) {
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const displayCode = stripMarkdown(code)
+  const displayCode = hoistImports(stripMarkdown(code))
 
   const handleCopy = () => {
     navigator.clipboard.writeText(displayCode)
