@@ -10,6 +10,7 @@ Usage:
 import os
 import math
 import random
+import multiprocessing
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -20,8 +21,8 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 CANVAS_SIZE = 48
 NUM_CLASSES = 10
-SAMPLES_PER_CLASS = 4000
-BATCH_SIZE = 32
+SAMPLES_PER_CLASS = 10_000  # was 4,000 → 100,000 total
+BATCH_SIZE = 64  # was 32 — better throughput on Apple Silicon
 MAX_EPOCHS = 100
 STROKE_WIDTH = 1.5
 
@@ -249,7 +250,7 @@ def generate_square():
 
     # Slightly imperfect angles and side lengths
     skew = random.uniform(-0.08, 0.08)
-    side_var = [random.uniform(0.9, 1.1) for _ in range(4)]
+    side_var = [random.uniform(0.95, 1.05) for _ in range(4)]  # was 0.9–1.1, tighter = more square
 
     corners = [
         (cx - half * side_var[0], cy - half * side_var[1]),
@@ -265,7 +266,7 @@ def generate_square():
 
 def generate_rectangle():
     w = 50 + random.random() * 30
-    aspect = random.uniform(1.4, 2.8)
+    aspect = random.uniform(1.6, 3.2)  # was 1.4–2.8, min raised to avoid square-like rectangles
     h = w / aspect
     cx, cy = 50, 50
 
@@ -310,8 +311,8 @@ def _generate_arrow(direction):
     head_angle = math.pi / 6 + random.uniform(-0.15, 0.15)
 
     shaft_points = random.randint(20, 40)
-    # Slight curvature in shaft
-    curvature = random.uniform(-3, 3)
+    # Slight curvature in shaft (reduced to preserve direction clarity)
+    curvature = random.uniform(-1.5, 1.5)  # was -3 to 3
 
     if direction == "right":
         start = (cx - length / 2, cy)
@@ -386,8 +387,8 @@ def generate_diamond():
     cx, cy = 50, 50
 
     # Make diamond more distinct: taller than wide (elongated vertically)
-    h_stretch = random.uniform(1.1, 1.5)
-    w_stretch = random.uniform(0.7, 1.0)
+    h_stretch = random.uniform(1.4, 2.0)  # was 1.1–1.5, more pronounced vertical stretch
+    w_stretch = random.uniform(0.5, 0.8)  # was 0.7–1.0, narrower to distinguish from triangle
     axis_var = [random.uniform(0.93, 1.07) for _ in range(4)]
 
     corners = [
@@ -570,29 +571,33 @@ def rasterize(points, size, stroke_width=STROKE_WIDTH):
 # ─── Dataset generation ─────────────────────────────────────────────────────
 
 
+def _generate_class(args):
+    """Generate samples for a single class — runs in a worker process."""
+    class_idx, shape_name, count = args
+    gen_fn = GENERATORS[shape_name]
+    imgs, lbls = [], []
+    for _ in range(count):
+        points = gen_fn()
+        points = augment(points, shape_name)
+        img = rasterize(points, CANVAS_SIZE)
+        imgs.append(img)
+        lbls.append(class_idx)
+    print(f"  [{class_idx + 1}/{NUM_CLASSES}] {shape_name} done ({count} samples)")
+    return imgs, lbls
+
+
 def generate_dataset():
-    """Generate full training dataset."""
-    images = []
-    labels = []
-
+    """Generate full training dataset using all CPU cores."""
     total = SAMPLES_PER_CLASS * NUM_CLASSES
-    print(f"Generating {total} samples ({SAMPLES_PER_CLASS} per class, {NUM_CLASSES} classes)...")
+    cores = multiprocessing.cpu_count()
+    print(f"Generating {total} samples ({SAMPLES_PER_CLASS}/class) across {cores} cores...")
 
-    for class_idx, shape_name in enumerate(SHAPE_NAMES):
-        print(f"  [{class_idx + 1}/{NUM_CLASSES}] {shape_name}...", end="", flush=True)
-        gen_fn = GENERATORS[shape_name]
+    args = [(i, name, SAMPLES_PER_CLASS) for i, name in enumerate(SHAPE_NAMES)]
+    with multiprocessing.Pool(processes=cores) as pool:
+        results = pool.map(_generate_class, args)
 
-        for _ in range(SAMPLES_PER_CLASS):
-            points = gen_fn()
-            points = augment(points, shape_name)
-            img = rasterize(points, CANVAS_SIZE)
-            images.append(img)
-            labels.append(class_idx)
-
-        print(" done")
-
-    images = np.array(images)[..., np.newaxis]  # (N, 48, 48, 1)
-    labels = np.array(labels)
+    images = np.concatenate([np.array(r[0]) for r in results])[..., np.newaxis]
+    labels = np.concatenate([np.array(r[1]) for r in results])
 
     print(f"Dataset: {images.shape[0]} images, shape {images.shape[1:]}")
     return images, labels
@@ -745,6 +750,7 @@ def train():
     print("=" * 60)
     print("CNN Shape Recognizer - Training")
     print("=" * 60)
+    print(f"Devices: {[d.name for d in tf.config.list_physical_devices()]}")
 
     # 1. Generate data
     images, labels = generate_dataset()
