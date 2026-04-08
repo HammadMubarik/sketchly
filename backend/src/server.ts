@@ -1,11 +1,14 @@
 import express from 'express'
 import cors from 'cors'
+import Anthropic from '@anthropic-ai/sdk'
 import { geometricRecognize } from './recognizer.js'
 
 const app = express()
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000
 
-app.use(express.json())
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+app.use(express.json({ limit: '10mb' }))
 // Allow cross-origin requests during development (adjust origin in prod)
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }))
 
@@ -42,6 +45,32 @@ app.post('/api/recognize', async (req, res) => {
   } catch (err) {
     console.error('recognize error', err)
     res.status(500).json({ error: 'recognition failed' })
+  }
+})
+
+app.post('/api/generate-java', async (req, res) => {
+  try {
+    const { image } = req.body
+    if (!image) return res.status(400).json({ error: 'image required' })
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: image } },
+          { type: 'text', text: 'This is a UML class diagram. Generate valid Java code for all classes shown. Use inheritance/implementation relationships shown by the arrows. Return only the Java code, no explanation.' }
+        ]
+      }]
+    })
+
+    const first = response.content[0]
+    const code = first?.type === 'text' ? first.text : ''
+    res.json({ code })
+  } catch (err: any) {
+    console.error('generate-java error', err)
+    res.status(500).json({ error: err?.message ?? 'code generation failed' })
   }
 })
 

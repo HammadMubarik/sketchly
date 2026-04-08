@@ -1,4 +1,4 @@
-import { Tldraw, track, useEditor, createShapeId } from '@tldraw/tldraw'
+import { Tldraw, track, useEditor, createShapeId, type Editor } from '@tldraw/tldraw'
 import type { TLShapeId } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
 import { cnnRecognizer } from '../../lib/cnnRecognizer'
@@ -16,6 +16,7 @@ import { EditPermissionHandler } from './EditPermissionHandler'
 import { ConnectionPoints } from './ConnectionPoints'
 import { getAnchorsForGeoType, getExternalAnchors, type ConnectionAnchor } from '../../lib/connectionPoints'
 import { UMLClassShapeUtil } from './UMLClassShapeUtil'
+import { JavaCodeModal } from './JavaCodeModal'
 import { findOrthogonalPath, type Obstacle, GRID_SIZE } from '../../lib/pathfinder'
 
 function SaveStatusIndicator({
@@ -632,6 +633,69 @@ export function SketchlyCanvas() {
   const [roomId, setRoomId] = useState<string | null>(null)
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
+  const [javaCode, setJavaCode] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const editorRef = useRef<Editor | null>(null)
+
+  const handleGenerateJava = async () => {
+    const editor = editorRef.current
+    if (!editor) return
+    setGenerating(true)
+    try {
+      const shapeIds = Array.from(editor.getCurrentPageShapeIds())
+
+      // Export SVG with 15s timeout
+      const svgString = await Promise.race([
+        editor.getSvgString(shapeIds),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error('SVG export timed out after 15s')), 15000)
+        ),
+      ])
+      if (!svgString) throw new Error('Could not export canvas')
+
+      // Convert SVG → PNG base64 with 10s timeout
+      // Use a base64 data URL (not blob URL) to avoid browser SVG security restrictions
+      const base64 = await Promise.race([
+        new Promise<string>((resolve, reject) => {
+          const img = new Image()
+          const svgEncoded = btoa(new TextDecoder('latin1').decode(new TextEncoder().encode(svgString.svg)))
+          img.onload = () => {
+            const canvas = document.createElement('canvas')
+            canvas.width = svgString.width
+            canvas.height = svgString.height
+            const ctx = canvas.getContext('2d')!
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            ctx.drawImage(img, 0, 0)
+            const dataUrl = canvas.toDataURL('image/png')
+            resolve(dataUrl.split(',')[1])
+          }
+          img.onerror = reject
+          img.src = `data:image/svg+xml;base64,${svgEncoded}`
+        }),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error('SVG→PNG conversion timed out after 10s')), 10000)
+        ),
+      ])
+
+      const resp = await fetch('http://localhost:5000/api/generate-java', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) {
+        setJavaCode(`Backend error (${resp.status}): ${data.error ?? 'unknown'}`)
+        return
+      }
+      setJavaCode(data.code || 'No code returned (Claude returned empty response).')
+    } catch (err) {
+      console.error('generate-java error', err)
+      setJavaCode(`Error: ${err instanceof Error ? err.message : 'Check the console.'}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   // Parse room ID from URL on mount
   useEffect(() => {
@@ -666,7 +730,32 @@ export function SketchlyCanvas() {
       <CollaboratorList collaborators={collaborators} />
       {roomId && <ConnectionStatus status={connectionStatus} />}
       <SaveStatusIndicator isSaving={saveStatus.isSaving} lastSavedAt={saveStatus.lastSavedAt} />
-      <Tldraw shapeUtils={[UMLClassShapeUtil]}>
+      <button
+        onClick={handleGenerateJava}
+        disabled={generating}
+        style={{
+          position: 'fixed',
+          bottom: '1rem',
+          right: '1rem',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: generating ? '#6b7280' : '#3b82f6',
+          color: 'white',
+          padding: '0.5rem 1rem',
+          borderRadius: '6px',
+          border: 'none',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          cursor: generating ? 'not-allowed' : 'pointer',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        }}
+      >
+        {generating ? 'Generating...' : '⚡ Generate Java'}
+      </button>
+      {javaCode && <JavaCodeModal code={javaCode} onClose={() => setJavaCode(null)} />}
+      <Tldraw shapeUtils={[UMLClassShapeUtil]} onMount={(editor) => { editorRef.current = editor }}>
         <ShapeRecognitionHandler />
         <ConnectionPoints />
         {roomId && (
