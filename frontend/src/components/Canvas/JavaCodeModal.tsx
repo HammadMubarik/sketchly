@@ -5,13 +5,44 @@ interface JavaCodeModalProps {
   onClose: () => void
 }
 
+function parseJavaFiles(code: string): { name: string; content: string }[] {
+  const pattern = /(?:public\s+)?(?:class|interface|enum)\s+(\w+)/g
+  const matches = [...code.matchAll(pattern)]
+
+  if (matches.length === 0) return [{ name: 'Main.java', content: code }]
+
+  return matches.map((m, i) => {
+    const start = m.index!
+    const end = matches[i + 1]?.index ?? code.length
+    return { name: `${m[1]}.java`, content: code.slice(start, end).trim() }
+  })
+}
+
 export function JavaCodeModal({ code, onClose }: JavaCodeModalProps) {
   const [copied, setCopied] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSaveFiles = async () => {
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker()
+      const files = parseJavaFiles(code)
+      for (const file of files) {
+        const fileHandle = await dirHandle.getFileHandle(file.name, { create: true })
+        const writable = await fileHandle.createWritable()
+        await writable.write(file.content)
+        await writable.close()
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err: any) {
+      if (err.name !== 'AbortError') console.error('Save failed:', err)
+    }
   }
 
   return (
@@ -82,6 +113,21 @@ export function JavaCodeModal({ code, onClose }: JavaCodeModalProps) {
             }}
           >
             {copied ? 'Copied!' : 'Copy'}
+          </button>
+          <button
+            onClick={handleSaveFiles}
+            style={{
+              background: saved ? '#a6e3a1' : '#6366f1',
+              color: saved ? '#1e1e2e' : 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.4rem 1rem',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            {saved ? 'Saved!' : 'Save Files'}
           </button>
           <button
             onClick={onClose}
