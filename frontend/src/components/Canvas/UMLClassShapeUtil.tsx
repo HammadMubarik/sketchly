@@ -1,6 +1,6 @@
 import { BaseBoxShapeUtil, HTMLContainer, T, useEditor } from '@tldraw/tldraw'
 import type { TLBaseShape } from '@tldraw/tldraw'
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useLayoutEffect, useEffect } from 'react'
 
 export type UMLClassShapeProps = {
   w: number
@@ -21,19 +21,60 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
   const topRef = useRef<HTMLTextAreaElement>(null)
   const midRef = useRef<HTMLTextAreaElement>(null)
   const botRef = useRef<HTMLTextAreaElement>(null)
+  const topCursor = useRef<{ start: number; end: number } | null>(null)
+  const midCursor = useRef<{ start: number; end: number } | null>(null)
+  const botCursor = useRef<{ start: number; end: number } | null>(null)
+
+  // Cursor restoration — pure DOM, no state update, safe to run every render
+  useLayoutEffect(() => {
+    if (topCursor.current && topRef.current) {
+      topRef.current.setSelectionRange(topCursor.current.start, topCursor.current.end)
+      topCursor.current = null
+    }
+    if (midCursor.current && midRef.current) {
+      midRef.current.setSelectionRange(midCursor.current.start, midCursor.current.end)
+      midCursor.current = null
+    }
+    if (botCursor.current && botRef.current) {
+      botRef.current.setSelectionRange(botCursor.current.start, botCursor.current.end)
+      botCursor.current = null
+    }
+  })
+
+  // Auto-size on text change (initial load + Y.js sync). Runs only when text changes, not on height changes, so no infinite loop.
+  useEffect(() => {
+    if (!topRef.current || !midRef.current || !botRef.current) return
+    topRef.current.style.height = 'auto'
+    midRef.current.style.height = 'auto'
+    botRef.current.style.height = 'auto'
+    const topH = Math.max(MIN_SECTION_H, topRef.current.scrollHeight)
+    const midH = Math.max(MIN_SECTION_H, midRef.current.scrollHeight)
+    const botH = Math.max(MIN_SECTION_H, botRef.current.scrollHeight)
+    topRef.current.style.height = topH + 'px'
+    midRef.current.style.height = midH + 'px'
+    botRef.current.style.height = botH + 'px'
+    const totalH = topH + midH + botH
+    if (Math.abs(totalH - shape.props.h) > 1) {
+      editor.updateShape<UMLClassShape>({
+        id: shape.id,
+        type: 'uml-class',
+        props: { ...shape.props, h: totalH },
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shape.props.topText, shape.props.middleText, shape.props.bottomText])
 
   const handleChange = useCallback(
-    (field: 'topText' | 'middleText' | 'bottomText', value: string) => {
-      // Measure heights after the DOM has updated
-      requestAnimationFrame(() => {
-        const topH = Math.max(MIN_SECTION_H, topRef.current?.scrollHeight ?? MIN_SECTION_H)
-        const midH = Math.max(MIN_SECTION_H, midRef.current?.scrollHeight ?? MIN_SECTION_H)
-        const botH = Math.max(MIN_SECTION_H, botRef.current?.scrollHeight ?? MIN_SECTION_H)
-        editor.updateShape<UMLClassShape>({
-          id: shape.id,
-          type: 'uml-class',
-          props: { ...shape.props, [field]: value, h: topH + midH + botH },
-        })
+    (field: 'topText' | 'middleText' | 'bottomText', value: string, changedEl: HTMLTextAreaElement) => {
+      changedEl.style.height = 'auto'
+      const topH = Math.max(MIN_SECTION_H, topRef.current?.scrollHeight ?? MIN_SECTION_H)
+      const midH = Math.max(MIN_SECTION_H, midRef.current?.scrollHeight ?? MIN_SECTION_H)
+      const botH = Math.max(MIN_SECTION_H, botRef.current?.scrollHeight ?? MIN_SECTION_H)
+      changedEl.style.height = (field === 'topText' ? topH : field === 'middleText' ? midH : botH) + 'px'
+      editor.updateShape<UMLClassShape>({
+        id: shape.id,
+        type: 'uml-class',
+        props: { ...shape.props, [field]: value, h: topH + midH + botH },
       })
     },
     [editor, shape]
@@ -81,16 +122,15 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
             textAlign: 'center',
           }}
           onChange={e => {
-            const el = e.target
-            el.style.height = 'auto'
-            el.style.height = el.scrollHeight + 'px'
-            handleChange('topText', e.target.value)
+            topCursor.current = { start: e.target.selectionStart ?? 0, end: e.target.selectionEnd ?? 0 }
+            handleChange('topText', e.target.value, e.target)
           }}
           onPointerDown={stopProp}
           onPointerMove={stopProp}
           onMouseDown={stopProp}
           onKeyDown={stopProp}
           onKeyUp={stopProp}
+          onPaste={stopProp}
         />
         <textarea
           ref={midRef}
@@ -98,16 +138,15 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
           placeholder="Attributes"
           style={{ ...textareaStyle, borderBottom: '1.5px solid #1a1a1a' }}
           onChange={e => {
-            const el = e.target
-            el.style.height = 'auto'
-            el.style.height = el.scrollHeight + 'px'
-            handleChange('middleText', e.target.value)
+            midCursor.current = { start: e.target.selectionStart ?? 0, end: e.target.selectionEnd ?? 0 }
+            handleChange('middleText', e.target.value, e.target)
           }}
           onPointerDown={stopProp}
           onPointerMove={stopProp}
           onMouseDown={stopProp}
           onKeyDown={stopProp}
           onKeyUp={stopProp}
+          onPaste={stopProp}
         />
         <textarea
           ref={botRef}
@@ -115,16 +154,15 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
           placeholder="Methods"
           style={{ ...textareaStyle, flex: 1 }}
           onChange={e => {
-            const el = e.target
-            el.style.height = 'auto'
-            el.style.height = el.scrollHeight + 'px'
-            handleChange('bottomText', e.target.value)
+            botCursor.current = { start: e.target.selectionStart ?? 0, end: e.target.selectionEnd ?? 0 }
+            handleChange('bottomText', e.target.value, e.target)
           }}
           onPointerDown={stopProp}
           onPointerMove={stopProp}
           onMouseDown={stopProp}
           onKeyDown={stopProp}
           onKeyUp={stopProp}
+          onPaste={stopProp}
         />
       </div>
     </HTMLContainer>

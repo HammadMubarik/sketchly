@@ -719,7 +719,9 @@ def export_to_tfjs(model, output_dir):
         weight_vars = layer.weights
         for i, w in enumerate(layer_weights):
             w = w.astype(np.float32)
-            full_name = f"{layer.name}/{weight_vars[i].name}"
+            # weight_vars[i].name is e.g. "conv1/kernel:0" — strip layer prefix and ":0"
+            var_name = weight_vars[i].name.split('/')[-1].replace(':0', '')
+            full_name = f"{layer.name}/{var_name}"
             weight_entries.append(
                 {"name": full_name, "shape": list(w.shape), "dtype": "float32"}
             )

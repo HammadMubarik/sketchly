@@ -127,8 +127,7 @@ const ShapeRecognitionHandler = track(() => {
             let result = { name: 'unknown', confidence: 0 }
             const threshold = 0.55
 
-            // Try CNN first (with 10s timeout to prevent silent TF.js hangs)
-            let cnnConfident = false
+            // Run CNN recognizer
             try {
               const cnnResult = await Promise.race([
                 cnnRecognizer.recognize(points),
@@ -138,37 +137,17 @@ const ShapeRecognitionHandler = track(() => {
               ])
               if (cnnResult.confidence > threshold) {
                 result = cnnResult
-                cnnConfident = true
               }
             } catch (cnnError) {
-              console.error('CNN recognition failed, trying backend API:', cnnError)
+              console.error('CNN recognition failed:', cnnError)
             }
 
-            // Fall back to backend API when CNN throws OR returns low confidence
-            if (!cnnConfident) {
-              try {
-                const apiBase = window.location.port === '5173' ? 'http://localhost:5000' : ''
-                const resp = await fetch(apiBase + '/api/recognize', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ points }),
-                })
-                if (resp.ok) {
-                  result = await resp.json()
-                }
-              } catch (apiErr) {
-                console.error('Backend API also failed:', apiErr)
-              }
-            }
-
-            // Geometric corner-count correction for borderline CNN results.
-            // Counts significant direction changes in the stroke to determine
-            // how many corners the shape has (3 = triangle, 4 = rectangle/square).
-            if (result.confidence < 0.78) {
+            // Always run geometric corner analysis — used to correct CNN mistakes.
+            {
               const stride = Math.max(1, Math.floor(points.length / 40))
               const subs: Point[] = []
               for (let i = 0; i < points.length; i += stride) subs.push(points[i])
-              const WIN = 3
+              const WIN = 4
               let corners = 0
               let lastCorner = -WIN * 4
               for (let i = WIN; i < subs.length - WIN; i++) {
@@ -181,7 +160,7 @@ const ShapeRecognitionHandler = track(() => {
                 if (len1 < 2 || len2 < 2) continue
                 const cos = (dx1 * dx2 + dy1 * dy2) / (len1 * len2)
                 const angle = Math.acos(Math.max(-1, Math.min(1, cos)))
-                if (angle > Math.PI * 0.33 && i - lastCorner > WIN * 3) {
+                if (angle > Math.PI * 0.28 && i - lastCorner > WIN * 2) {
                   corners++
                   lastCorner = i
                 }
@@ -192,11 +171,22 @@ const ShapeRecognitionHandler = track(() => {
               const geoH = Math.max(...ys) - Math.min(...ys)
               const aspect = geoW / Math.max(geoH, 1)
 
-              if (corners >= 4 && (result.name === 'triangle' || result.name === 'line' || result.name === 'unknown')) {
-                const corrected = aspect > 1.4 ? 'rectangle' : 'square'
-                result = { ...result, name: corrected, confidence: 0.72 }
-              } else if (corners <= 3 && corners >= 2 && (result.name === 'rectangle' || result.name === 'square')) {
-                result = { ...result, name: 'triangle', confidence: 0.72 }
+              if (corners >= 4) {
+                // 4+ corners = rectangle/square — override triangle/line/unknown always, override others if CNN uncertain
+                if (result.confidence < 0.78 || result.name === 'triangle' || result.name === 'unknown') {
+                  const corrected = aspect > 1.4 ? 'rectangle' : 'square'
+                  result = { ...result, name: corrected, confidence: 0.72 }
+                }
+              } else if (corners === 3) {
+                // 3 corners = triangle — override if CNN is uncertain or returned unknown
+                if (result.confidence < 0.78 || result.name === 'unknown') {
+                  result = { ...result, name: 'triangle', confidence: 0.72 }
+                }
+              } else if (corners <= 2 && result.confidence < 0.78) {
+                // Very few corners — correct rectangle/square to triangle only if CNN was uncertain
+                if (result.name === 'rectangle' || result.name === 'square') {
+                  result = { ...result, name: 'triangle', confidence: 0.72 }
+                }
               }
             }
 

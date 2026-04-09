@@ -1,7 +1,6 @@
 import express from 'express'
 import cors from 'cors'
 import Anthropic from '@anthropic-ai/sdk'
-import { geometricRecognize } from './recognizer.js'
 
 const app = express()
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000
@@ -17,36 +16,6 @@ app.get('/', (req, res) => res.send('Sketchly recognizer backend is up. Use POST
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
-app.post('/api/recognize', async (req, res) => {
-  try {
-    const points = req.body?.points
-    if (!Array.isArray(points) || points.length === 0) {
-      return res.status(400).json({ error: 'points array required' })
-    }
-
-    // If a remote recognizer URL is provided via env, proxy the request
-    const remote = process.env.RECOGNIZER_URL
-    if (remote) {
-      const resp = await fetch(remote, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(process.env.RECOGNIZER_API_KEY ? { Authorization: `Bearer ${process.env.RECOGNIZER_API_KEY}` } : {}),
-        },
-        body: JSON.stringify({ points }),
-      })
-      const data = await resp.json()
-      return res.json(data)
-    }
-
-    // Fallback to local geometric recognizer
-    const result = geometricRecognize(points)
-    return res.json(result)
-  } catch (err) {
-    console.error('recognize error', err)
-    res.status(500).json({ error: 'recognition failed' })
-  }
-})
 
 app.post('/api/generate-java', async (req, res) => {
   try {
