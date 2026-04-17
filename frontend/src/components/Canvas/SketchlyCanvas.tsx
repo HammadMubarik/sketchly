@@ -84,6 +84,9 @@ const ShapeRecognitionHandler = track(() => {
     // Track every shape ID that has been processed this session so we
     // never accidentally re-process or skip the newest shape.
     const processedIds = new Set<TLShapeId>()
+    // Count attempts per shape so we give up after a few failed recognitions
+    // instead of retrying forever.
+    const attemptCount = new Map<TLShapeId, number>()
 
     const handlePointerUp = () => {
       if (pendingRef.current) return  // already a recognition queued, skip duplicate
@@ -137,6 +140,9 @@ const ShapeRecognitionHandler = track(() => {
               ])
               if (cnnResult.confidence > threshold) {
                 result = cnnResult
+              } else if (cnnResult.name === 'line' && cnnResult.confidence > 0.25) {
+                // Lines drawn between shapes are often curved/imprecise — accept at lower threshold
+                result = cnnResult
               }
             } catch (cnnError) {
               console.error('CNN recognition failed:', cnnError)
@@ -171,29 +177,72 @@ const ShapeRecognitionHandler = track(() => {
               const geoH = Math.max(...ys) - Math.min(...ys)
               const aspect = geoW / Math.max(geoH, 1)
 
+              // tldraw marks a draw shape isClosed when the endpoint is very
+              // near the start.  Also detect "nearly closes" spatially because
+              // tldraw's threshold is strict — a 4-side square drawn without
+              // precisely returning to the start pixel is still a closed shape.
+              const firstPt = points[0]
+              const lastPt  = points[points.length - 1]
+              const closeGap = Math.hypot(firstPt.x - lastPt.x, firstPt.y - lastPt.y)
+              const shapeSize = Math.max(geoW, geoH)
+              const strokeNearlyCloses = shapeProps.isClosed || closeGap < shapeSize * 0.3
+
+              // The closing segment of a closed stroke adds one more direction
+              // change that is NOT in the points array — compensate for it.
+              if (strokeNearlyCloses) corners++
+
               if (corners >= 4) {
-                // 4+ corners = rectangle/square — override triangle/line/unknown always, override others if CNN uncertain
+                // 4+ corners → rectangle/square
                 if (result.confidence < 0.78 || result.name === 'triangle' || result.name === 'unknown') {
                   const corrected = aspect > 1.4 ? 'rectangle' : 'square'
                   result = { ...result, name: corrected, confidence: 0.72 }
                 }
               } else if (corners === 3) {
-                // 3 corners = triangle — override if CNN is uncertain or returned unknown
-                if (result.confidence < 0.78 || result.name === 'unknown') {
-                  result = { ...result, name: 'triangle', confidence: 0.72 }
+                if (result.name === 'unknown') {
+                  // 3 corners with unknown CNN result: use aspect ratio and
+                  // closing behaviour to distinguish a square traced as 4 sides
+                  // from a genuine triangle.
+                  if (strokeNearlyCloses && aspect > 0.5 && aspect < 2.0) {
+                    const corrected = aspect > 1.4 ? 'rectangle' : 'square'
+                    result = { ...result, name: corrected, confidence: 0.68 }
+                  } else {
+                    result = { ...result, name: 'triangle', confidence: 0.72 }
+                  }
+                } else if ((result.name === 'square' || result.name === 'rectangle') && result.confidence < threshold) {
+                  // CNN weakly voted square/rectangle and geometry agrees — bump over threshold
+                  result = { ...result, confidence: threshold + 0.01 }
                 }
               } else if (corners <= 2 && result.confidence < 0.78) {
-                // Very few corners — correct rectangle/square to triangle only if CNN was uncertain
-                if (result.name === 'rectangle' || result.name === 'square') {
+                // Very few corners and CNN uncertain — correct open rectangle/
+                // square strokes to triangle (they were probably drawn as a
+                // U-shape or L-shape, not a closed box).
+                if (!strokeNearlyCloses && (result.name === 'rectangle' || result.name === 'square')) {
                   result = { ...result, name: 'triangle', confidence: 0.72 }
                 }
               }
             }
 
-            // Mark as processed regardless of outcome to prevent infinite retry loops
-            processedIds.add(latestShape.id)
-
-            if (result.confidence <= threshold || result.name === 'unknown') return
+            const effectiveThreshold = result.name === 'line' ? 0.25 : threshold
+            if (result.confidence <= effectiveThreshold || result.name === 'unknown') {
+              // Recognition failed.  Track attempts and give up after 3 so we
+              // don't retry forever.  Between attempts, schedule an automatic
+              // re-run so the user doesn't have to switch tools to trigger it.
+              const attempts = (attemptCount.get(latestShape.id) ?? 0) + 1
+              attemptCount.set(latestShape.id, attempts)
+              if (attempts >= 3) {
+                processedIds.add(latestShape.id) // give up permanently
+              } else {
+                // Auto-retry: processingRef is released in the finally block
+                // below, so this setTimeout fires into a clear processing state.
+                setTimeout(() => {
+                  if (!processedIds.has(latestShape.id)) {
+                    pendingRef.current = false
+                    handlePointerUp()
+                  }
+                }, 500)
+              }
+              return
+            }
 
             const bounds = editor.getShapePageBounds(latestShape)
             if (!bounds) return
@@ -487,6 +536,10 @@ const ShapeRecognitionHandler = track(() => {
                   return
               }
 
+              // Mark as processed only now that we're about to delete the draw
+              // shape and replace it — prevents the tool-change retry from
+              // double-converting a shape that was already handled.
+              processedIds.add(latestShape.id)
               editor.deleteShapes([latestShape.id])
 
               // Auto-snap: if a new geo shape was created, check if any of its

@@ -41,18 +41,23 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
     }
   })
 
-  // Auto-size on text change (initial load + Y.js sync). Runs only when text changes, not on height changes, so no infinite loop.
+  // Measure the natural content height of a textarea by collapsing it to 0
+  // before reading scrollHeight.  This ensures flex-stretch or a prior
+  // explicit height don't inflate the reported value.
+  const measureH = (el: HTMLTextAreaElement) => {
+    el.style.height = '0px'
+    const h = Math.max(MIN_SECTION_H, el.scrollHeight)
+    el.style.height = h + 'px'
+    return h
+  }
+
+  // Auto-size on text change (initial load + Y.js sync). Runs only when text
+  // changes, not on height changes, so no infinite loop.
   useEffect(() => {
     if (!topRef.current || !midRef.current || !botRef.current) return
-    topRef.current.style.height = 'auto'
-    midRef.current.style.height = 'auto'
-    botRef.current.style.height = 'auto'
-    const topH = Math.max(MIN_SECTION_H, topRef.current.scrollHeight)
-    const midH = Math.max(MIN_SECTION_H, midRef.current.scrollHeight)
-    const botH = Math.max(MIN_SECTION_H, botRef.current.scrollHeight)
-    topRef.current.style.height = topH + 'px'
-    midRef.current.style.height = midH + 'px'
-    botRef.current.style.height = botH + 'px'
+    const topH = measureH(topRef.current)
+    const midH = measureH(midRef.current)
+    const botH = measureH(botRef.current)
     const totalH = topH + midH + botH
     if (Math.abs(totalH - shape.props.h) > 1) {
       editor.updateShape<UMLClassShape>({
@@ -65,12 +70,13 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
   }, [shape.props.topText, shape.props.middleText, shape.props.bottomText])
 
   const handleChange = useCallback(
-    (field: 'topText' | 'middleText' | 'bottomText', value: string, changedEl: HTMLTextAreaElement) => {
-      changedEl.style.height = 'auto'
-      const topH = Math.max(MIN_SECTION_H, topRef.current?.scrollHeight ?? MIN_SECTION_H)
-      const midH = Math.max(MIN_SECTION_H, midRef.current?.scrollHeight ?? MIN_SECTION_H)
-      const botH = Math.max(MIN_SECTION_H, botRef.current?.scrollHeight ?? MIN_SECTION_H)
-      changedEl.style.height = (field === 'topText' ? topH : field === 'middleText' ? midH : botH) + 'px'
+    (field: 'topText' | 'middleText' | 'bottomText', value: string) => {
+      if (!topRef.current || !midRef.current || !botRef.current) return
+      // Collapse ALL sections before measuring so scrollHeight reflects
+      // content only — not flex-stretch or a stale explicit height.
+      const topH = measureH(topRef.current)
+      const midH = measureH(midRef.current)
+      const botH = measureH(botRef.current)
       editor.updateShape<UMLClassShape>({
         id: shape.id,
         type: 'uml-class',

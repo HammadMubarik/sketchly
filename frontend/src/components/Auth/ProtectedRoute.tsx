@@ -48,8 +48,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   const handleCreateRoom = () => {
-    window.history.pushState({}, '', window.location.pathname)
-    setNavState({ view: 'canvas', roomId: null })
+    const newRoomId = crypto.randomUUID()
+    const newUrl = `${window.location.pathname}?room=${newRoomId}`
+    window.history.pushState({}, '', newUrl)
+    setNavState({ view: 'canvas', roomId: newRoomId })
   }
 
   const handleBackToLanding = () => {
