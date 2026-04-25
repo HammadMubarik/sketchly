@@ -29,8 +29,13 @@ export class YjsStore {
     // Create a Y.Map for storing shapes - each shape is a CRDT
     this.yShapes = this.ydoc.getMap('shapes')
     
-    // Connect to WebSocket server for syncing
-    const wsUrl = config.websocketUrl || 'ws://localhost:1234'
+    // Connect to WebSocket server for syncing.
+    // Prod: same origin as the page (backend handles WS upgrades on the same port).
+    // Dev: override via VITE_WS_URL or the explicit config field.
+    const wsUrl =
+      config.websocketUrl ||
+      import.meta.env.VITE_WS_URL ||
+      `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
     
     this.provider = new WebsocketProvider(
       wsUrl,

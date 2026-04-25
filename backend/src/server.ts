@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import http from 'http'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import Anthropic from '@anthropic-ai/sdk'
 import { setupWSConnection } from 'y-websocket/bin/utils'
@@ -13,7 +15,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 app.use(express.json({ limit: '10mb' }))
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }))
 
-app.get('/', (_req, res) => res.send('Sketchly recognizer backend is up. Use POST /api/recognize'))
+app.get('/api', (_req, res) => res.send('Sketchly recognizer backend is up. Use POST /api/recognize'))
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
 app.post('/api/generate-java', async (req, res) => {
@@ -41,6 +43,20 @@ app.post('/api/generate-java', async (req, res) => {
     console.error('generate-java error', err)
     res.status(500).json({ error: err?.message ?? 'code generation failed' })
   }
+})
+
+// Serve the built Vite frontend. The Dockerfile copies frontend/dist to ./public
+// (relative to the runtime image's /app), which is one level up from dist/server.js.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const publicDir = path.resolve(__dirname, '../public')
+app.use(express.static(publicDir))
+
+// SPA fallback: any non-API GET that isn't a static file should return index.html
+// so client-side routing works on direct loads / refreshes.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next()
+  if (req.path.startsWith('/api') || req.path === '/health') return next()
+  res.sendFile(path.join(publicDir, 'index.html'))
 })
 
 // Combine HTTP + WebSocket on a single port: Railway (and most PaaS) expose

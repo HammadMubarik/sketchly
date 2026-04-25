@@ -5,5 +5,4 @@
 **/*.log
 .git
 .claude
-frontend
 training

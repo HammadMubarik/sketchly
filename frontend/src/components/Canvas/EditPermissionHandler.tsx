@@ -49,10 +49,12 @@ export const EditPermissionHandler = track(function EditPermissionHandler({
   // Check permissions whenever collaborators change or owner is set
   useEffect(() => {
     if (!roomId || !user?.id || !ownerId) return
+    const userId: string = user.id
+    const currentRoomId: string = roomId
 
     async function checkAndApplyPermissions() {
       // If current user is the owner, they always have edit permission
-      if (user.id === ownerId) {
+      if (userId === ownerId) {
         if (lastReadOnlyStateRef.current !== false) {
           editor.updateInstanceState({ isReadonly: false })
           lastReadOnlyStateRef.current = false
@@ -71,7 +73,7 @@ export const EditPermissionHandler = track(function EditPermissionHandler({
         }
       } else {
         // Owner is not present, check user's edit permission
-        const canEdit = await getUserEditPermission(user.id, roomId)
+        const canEdit = await getUserEditPermission(userId, currentRoomId)
         const shouldBeReadOnly = !canEdit
 
         if (lastReadOnlyStateRef.current !== shouldBeReadOnly) {

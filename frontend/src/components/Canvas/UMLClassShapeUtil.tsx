@@ -129,7 +129,7 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
           }}
           onChange={e => {
             topCursor.current = { start: e.target.selectionStart ?? 0, end: e.target.selectionEnd ?? 0 }
-            handleChange('topText', e.target.value, e.target)
+            handleChange('topText', e.target.value)
           }}
           onPointerDown={stopProp}
           onPointerMove={stopProp}
@@ -145,7 +145,7 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
           style={{ ...textareaStyle, borderBottom: '1.5px solid #1a1a1a' }}
           onChange={e => {
             midCursor.current = { start: e.target.selectionStart ?? 0, end: e.target.selectionEnd ?? 0 }
-            handleChange('middleText', e.target.value, e.target)
+            handleChange('middleText', e.target.value)
           }}
           onPointerDown={stopProp}
           onPointerMove={stopProp}
@@ -161,7 +161,7 @@ function UMLClassComponent({ shape }: { shape: UMLClassShape }) {
           style={{ ...textareaStyle, flex: 1 }}
           onChange={e => {
             botCursor.current = { start: e.target.selectionStart ?? 0, end: e.target.selectionEnd ?? 0 }
-            handleChange('bottomText', e.target.value, e.target)
+            handleChange('bottomText', e.target.value)
           }}
           onPointerDown={stopProp}
           onPointerMove={stopProp}

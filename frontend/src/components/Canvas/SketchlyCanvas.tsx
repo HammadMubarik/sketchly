@@ -705,7 +705,8 @@ export function SketchlyCanvas() {
         ),
       ])
 
-      const resp = await fetch('http://localhost:5000/api/generate-java', {
+      const apiBase = import.meta.env.VITE_BACKEND_URL ?? ''
+      const resp = await fetch(`${apiBase}/api/generate-java`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64 }),

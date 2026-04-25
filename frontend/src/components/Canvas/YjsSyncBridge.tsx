@@ -73,7 +73,7 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
         console.log(`Loading ${yShapes.size} shapes from Y.js`)
         isApplyingRemoteRef.current = true
         editor.store.mergeRemoteChanges(() => {
-          yShapes.forEach((record, id) => {
+          yShapes.forEach((record) => {
             editor.store.put([record])
           })
         })
