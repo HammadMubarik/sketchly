@@ -17,7 +17,7 @@ import { ConnectionPoints } from './ConnectionPoints'
 import { getAnchorsForGeoType, getExternalAnchors, type ConnectionAnchor } from '../../lib/connectionPoints'
 import { UMLClassShapeUtil } from './UMLClassShapeUtil'
 import { JavaCodeModal } from './JavaCodeModal'
-import { findOrthogonalPath, type Obstacle, GRID_SIZE } from '../../lib/pathfinder'
+import { findOrthogonalPath, type Obstacle } from '../../lib/pathfinder'
 
 function SaveStatusIndicator({
   isSaving,
@@ -480,25 +480,15 @@ const ShapeRecognitionHandler = track(() => {
                       }
                     }
                   } else {
-                    // Build obstacles: include ALL shapes, but endpoint shapes get negative
-                    // padding so only their interior is blocked — border cells (connection
-                    // points) remain open, preventing the route from cutting through boxes.
-                    const endpointIds = new Set<TLShapeId>([
-                      lineStartSnap?.shape.id,
-                      lineEndSnap?.shape.id,
-                    ].filter(Boolean) as TLShapeId[])
-
+                    // Build obstacles: every shape is a full obstacle. The pathfinder
+                    // punches narrow doorways at the start/end anchors using startDir/
+                    // endDir, so endpoint shapes don't need a padding override.
                     const lineObstacles: Obstacle[] = geoShapes
                       .filter(s => s.id !== latestShape.id)
                       .flatMap(s => {
                         const b = editor.getShapePageBounds(s)
                         if (!b) return []
-                        const isEndpoint = endpointIds.has(s.id)
-                        const obs: Obstacle = {
-                          x: b.x, y: b.y, width: b.width, height: b.height,
-                          ...(isEndpoint ? { padding: -GRID_SIZE } : {}),
-                        }
-                        return [obs]
+                        return [{ x: b.x, y: b.y, width: b.width, height: b.height }]
                       })
 
                     const routeStart = lineStartSnap
@@ -508,7 +498,22 @@ const ShapeRecognitionHandler = track(() => {
                       ? { x: lineEndSnap.pagePos.x, y: lineEndSnap.pagePos.y }
                       : { x: last.x, y: last.y }
 
-                    const route = findOrthogonalPath(routeStart, routeEnd, lineObstacles)
+                    // Outward direction at a side-midpoint anchor (normalized 0–1).
+                    // Returns null for interior anchors (e.g. UML compartment dividers).
+                    const outwardDir = (a: { x: number; y: number }): [number, number] | null => {
+                      if (a.x <= 0.001) return [-1, 0]
+                      if (a.x >= 0.999) return [1, 0]
+                      if (a.y <= 0.001) return [0, -1]
+                      if (a.y >= 0.999) return [0, 1]
+                      return null
+                    }
+                    const startOut = lineStartSnap ? outwardDir(lineStartSnap.anchor) : null
+                    const endOut = lineEndSnap ? outwardDir(lineEndSnap.anchor) : null
+                    const route = findOrthogonalPath(routeStart, routeEnd, lineObstacles, {
+                      startDir: startOut ?? undefined,
+                      // arrival direction is opposite of the end-anchor's outward normal
+                      endDir: endOut ? [-endOut[0], -endOut[1]] : undefined,
+                    })
 
                     // Position the line shape at the first waypoint; all points are relative to it
                     const ox = route[0].x, oy = route[0].y
