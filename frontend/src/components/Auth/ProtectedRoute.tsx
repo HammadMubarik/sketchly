@@ -3,6 +3,7 @@ import { useAuth } from '../../../Contexts/AuthContext'
 import { Login } from '../Auth/Login'
 import { LandingPage } from '../Landing/LandingPage'
 import { ChevronLeft, Loader2 } from 'lucide-react'
+import { ensureDrawingExists } from '../../lib/drawingStorage'
 
 type AppView = 'landing' | 'canvas'
 
@@ -47,8 +48,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     setNavState({ view: 'canvas', roomId })
   }
 
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
     const newRoomId = crypto.randomUUID()
+    // Create the drawing row BEFORE navigating so the owner's recordRoomVisit
+    // (fired on canvas mount) can satisfy the FK constraint on drawings.id.
+    if (user?.id) {
+      try {
+        await ensureDrawingExists(user.id, newRoomId)
+      } catch (e) {
+        console.error(e)
+      }
+    }
     const newUrl = `${window.location.pathname}?room=${newRoomId}`
     window.history.pushState({}, '', newUrl)
     setNavState({ view: 'canvas', roomId: newRoomId })

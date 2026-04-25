@@ -29,10 +29,24 @@ export async function getDrawingById(drawingId: string): Promise<Drawing | null>
   return data
 }
 
+// Ensure a drawing row exists for the given ID.  Called immediately when a
+// new room is created so that room_visits from any joining user can reference
+// a valid drawings.id before the first auto-save snapshot is ready.
+export async function ensureDrawingExists(userId: string, drawingId: string): Promise<void> {
+  const { error } = await supabase
+    .from('drawings')
+    .upsert(
+      { id: drawingId, user_id: userId, name: 'Untitled Drawing', snapshot: null, is_default: false },
+      { onConflict: 'id', ignoreDuplicates: true }
+    )
+  if (error) console.error('Error ensuring drawing exists:', error)
+}
+
 export async function saveDrawingSnapshot(
   userId: string,
   drawingId: string | null,
-  snapshot: TLEditorSnapshot
+  snapshot: TLEditorSnapshot,
+  forcedId?: string
 ): Promise<Drawing> {
   if (drawingId) {
     const { data, error } = await supabase
@@ -51,12 +65,16 @@ export async function saveDrawingSnapshot(
   } else {
     const { data, error } = await supabase
       .from('drawings')
-      .insert({
-        user_id: userId,
-        name: 'Untitled Drawing',
-        snapshot,
-        is_default: false,
-      })
+      .upsert(
+        {
+          ...(forcedId ? { id: forcedId } : {}),
+          user_id: userId,
+          name: 'Untitled Drawing',
+          snapshot,
+          is_default: false,
+        },
+        forcedId ? { onConflict: 'id' } : undefined
+      )
       .select()
       .single()
 

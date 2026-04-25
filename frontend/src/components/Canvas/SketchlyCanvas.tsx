@@ -728,19 +728,21 @@ export function SketchlyCanvas() {
     }
   }, [])
 
-  // Record room visit whenever roomId is established
+  // Record room visit whenever roomId is established.
   useEffect(() => {
     if (!roomId || !user?.id) return
-
     const roomName = `Room ${roomId.slice(0, 8)}`
     recordRoomVisit(user.id, roomId, roomName)
   }, [roomId, user?.id])
 
-  // When drawing is saved/loaded, use its ID as room ID
+  // When drawing is saved/loaded, sync roomId to the real Supabase drawing ID.
+  // Always update so that the first auto-save replaces the temporary UUID we
+  // put in the URL at room-creation time with the actual drawing ID — this
+  // lets recordRoomVisit (which fires on roomId change) succeed with a valid
+  // foreign key instead of failing against a not-yet-existing drawings row.
   const handleDrawingLoaded = (drawingId: string) => {
-    if (!roomId) {
+    if (roomId !== drawingId) {
       setRoomId(drawingId)
-      // Update URL without reload
       const newUrl = `${window.location.pathname}?room=${drawingId}`
       window.history.replaceState({}, '', newUrl)
     }

@@ -23,7 +23,7 @@ app.post('/api/generate-java', async (req, res) => {
     if (!image) return res.status(400).json({ error: 'image required' })
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-opus-4-7',
       max_tokens: 4096,
       temperature: 0,
       messages: [{

@@ -65,7 +65,7 @@ export const AutoSaveHandler = track(function AutoSaveHandler({
     onSaveStatusChange?.({ isSaving: true, lastSavedAt: null })
 
     try {
-      const savedDrawing = await saveDrawingSnapshot(user.id, drawingIdRef.current, snapshot)
+      const savedDrawing = await saveDrawingSnapshot(user.id, drawingIdRef.current, snapshot, roomId ?? undefined)
 
       if (!drawingIdRef.current) {
         drawingIdRef.current = savedDrawing.id
