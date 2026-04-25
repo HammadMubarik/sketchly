@@ -12,6 +12,14 @@ export interface Collaborator {
   cursor: { x: number; y: number; pageId?: string } | null
 }
 
+// Module-level cache so a transient unmount/remount of YjsSyncBridge (e.g.
+// triggered by tldraw re-running children after a shape edit) doesn't
+// tear down the live WebSocket. We hold the store for a grace period and
+// either reuse it on remount or actually destroy it if no one comes back.
+type CachedStore = { store: YjsStore; destroyTimer: ReturnType<typeof setTimeout> | null }
+const storeCache = new Map<string, CachedStore>()
+const DESTROY_GRACE_MS = 2000
+
 interface YjsSyncBridgeProps {
   roomId: string
   onCollaboratorsChange?: (collaborators: Collaborator[]) => void
@@ -62,22 +70,37 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
     const user = userRef.current
     const userName = user?.email?.split('@')[0] || 'Anonymous'
 
-    // Create Y.js store for this room
-    const yjsStore = new YjsStore({
-      roomId,
-      userId: user?.id,
-      userName,
-    })
+    // Reuse a cached YjsStore if a remount happened within the grace period.
+    // This keeps the WS alive across React unmount/remount cycles caused by
+    // tldraw's reactive children rebuilding after shape edits.
+    const cached = storeCache.get(roomId)
+    let yjsStore: YjsStore
+    if (cached) {
+      console.log('[YjsSyncBridge] reusing cached YjsStore for room:', roomId)
+      if (cached.destroyTimer) {
+        clearTimeout(cached.destroyTimer)
+        cached.destroyTimer = null
+      }
+      yjsStore = cached.store
+    } else {
+      yjsStore = new YjsStore({
+        roomId,
+        userId: user?.id,
+        userName,
+      })
+      storeCache.set(roomId, { store: yjsStore, destroyTimer: null })
+
+      // Register status listener once per store. The callback reads from a ref
+      // so it always sees the latest parent setter without re-registering.
+      yjsStore.onConnectionStatusChange((status) => {
+        console.log('Y.js connection status:', status)
+        onStatusRef.current?.(status)
+      })
+    }
     yjsStoreRef.current = yjsStore
 
     const yShapes = yjsStore.getShapesMap()
     const awareness = yjsStore.getAwareness()
-
-    // Connection status
-    yjsStore.onConnectionStatusChange((status) => {
-      console.log('Y.js connection status:', status)
-      onStatusRef.current?.(status)
-    })
 
     // Wait for sync, then initialize
     yjsStore.waitForSync().then(() => {
@@ -173,14 +196,27 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
     handleAwarenessChange() // Initial call
 
     return () => {
-      console.warn('[YjsSyncBridge] cleanup running — destroying WS for room:', roomId, new Error('cleanup-trace').stack)
+      console.log('[YjsSyncBridge] cleanup — scheduling destroy for room:', roomId)
+      // Detach component-scoped listeners immediately so we don't double-handle
+      // events while the WS lingers in the cache.
       removeStoreListener()
       yShapes.unobserve(observeHandler)
       window.removeEventListener('pointermove', handlePointerMove)
       awareness.off('change', handleAwarenessChange)
-      yjsStore.destroy()
       yjsStoreRef.current = null
       initializedRef.current = false
+
+      // Defer the actual WS destroy so a remount within the grace period
+      // can reclaim the same store (and its live WebSocket).
+      const entry = storeCache.get(roomId)
+      if (entry) {
+        if (entry.destroyTimer) clearTimeout(entry.destroyTimer)
+        entry.destroyTimer = setTimeout(() => {
+          console.warn('[YjsSyncBridge] grace expired — destroying WS for room:', roomId)
+          entry.store.destroy()
+          storeCache.delete(roomId)
+        }, DESTROY_GRACE_MS)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
