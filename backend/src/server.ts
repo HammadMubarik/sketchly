@@ -1,6 +1,9 @@
 import express from 'express'
 import cors from 'cors'
+import http from 'http'
+import { WebSocketServer } from 'ws'
 import Anthropic from '@anthropic-ai/sdk'
+import { setupWSConnection } from 'y-websocket/bin/utils'
 
 const app = express()
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000
@@ -8,14 +11,10 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5000
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 app.use(express.json({ limit: '10mb' }))
-// Allow cross-origin requests during development (adjust origin in prod)
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }))
 
-// Root shows a small message so GET / doesn't return 404
-app.get('/', (req, res) => res.send('Sketchly recognizer backend is up. Use POST /api/recognize'))
-
-app.get('/health', (req, res) => res.json({ status: 'ok' }))
-
+app.get('/', (_req, res) => res.send('Sketchly recognizer backend is up. Use POST /api/recognize'))
+app.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
 app.post('/api/generate-java', async (req, res) => {
   try {
@@ -44,4 +43,19 @@ app.post('/api/generate-java', async (req, res) => {
   }
 })
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`))
+// Combine HTTP + WebSocket on a single port: Railway (and most PaaS) expose
+// only one $PORT per service, so the yjs WS server has to share with Express.
+const server = http.createServer(app)
+const wss = new WebSocketServer({ noServer: true })
+
+wss.on('connection', (conn, req) => {
+  setupWSConnection(conn, req, { gc: true })
+})
+
+server.on('upgrade', (req, socket, head) => {
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req)
+  })
+})
+
+server.listen(PORT, () => console.log(`Server listening on port ${PORT}`))
