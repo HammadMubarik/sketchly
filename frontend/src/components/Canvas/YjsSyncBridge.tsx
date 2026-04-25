@@ -56,6 +56,7 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
 
   useEffect(() => {
     if (!roomId || initializedRef.current) return
+    console.log('[YjsSyncBridge] init effect running for room:', roomId)
 
     const editor = editorRef.current
     const user = userRef.current
@@ -172,6 +173,7 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
     handleAwarenessChange() // Initial call
 
     return () => {
+      console.warn('[YjsSyncBridge] cleanup running — destroying WS for room:', roomId, new Error('cleanup-trace').stack)
       removeStoreListener()
       yShapes.unobserve(observeHandler)
       window.removeEventListener('pointermove', handlePointerMove)
