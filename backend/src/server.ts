@@ -65,10 +65,26 @@ const server = http.createServer(app)
 const wss = new WebSocketServer({ noServer: true })
 
 wss.on('connection', (conn, req) => {
-  setupWSConnection(conn, req, { gc: true })
+  const room = req.url ?? '?'
+  console.log(`[ws] connection opened: ${room}`)
+
+  conn.on('close', (code, reason) => {
+    console.log(`[ws] connection closed: ${room} code=${code} reason=${reason?.toString() || '<empty>'}`)
+  })
+  conn.on('error', (err) => {
+    console.error(`[ws] connection error: ${room}`, err)
+  })
+
+  try {
+    setupWSConnection(conn, req, { gc: true })
+  } catch (err) {
+    console.error(`[ws] setupWSConnection threw for ${room}`, err)
+    conn.close(1011, 'setupWSConnection failed')
+  }
 })
 
 server.on('upgrade', (req, socket, head) => {
+  console.log(`[ws] upgrade requested: ${req.url}`)
   wss.handleUpgrade(req, socket, head, (ws) => {
     wss.emit('connection', ws, req)
   })
