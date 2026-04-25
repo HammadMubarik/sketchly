@@ -30,6 +30,18 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
   const isApplyingRemoteRef = useRef(false)
   const initializedRef = useRef(false)
 
+  // Stash unstable inputs in refs so the WS-init effect can depend only on
+  // roomId. Without this, every parent re-render (auth resolves, tldraw
+  // signals fire, etc.) re-fires the effect and graceful-closes the WS.
+  const editorRef = useRef(editor)
+  const userRef = useRef(user)
+  const onCollabRef = useRef(onCollaboratorsChange)
+  const onStatusRef = useRef(onConnectionStatusChange)
+  useEffect(() => { editorRef.current = editor }, [editor])
+  useEffect(() => { userRef.current = user }, [user])
+  useEffect(() => { onCollabRef.current = onCollaboratorsChange }, [onCollaboratorsChange])
+  useEffect(() => { onStatusRef.current = onConnectionStatusChange }, [onConnectionStatusChange])
+
   // Throttle helper for cursor updates
   const throttle = useCallback((fn: (...args: any[]) => void, delay: number) => {
     let lastCall = 0
@@ -45,6 +57,8 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
   useEffect(() => {
     if (!roomId || initializedRef.current) return
 
+    const editor = editorRef.current
+    const user = userRef.current
     const userName = user?.email?.split('@')[0] || 'Anonymous'
 
     // Create Y.js store for this room
@@ -61,7 +75,7 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
     // Connection status
     yjsStore.onConnectionStatusChange((status) => {
       console.log('Y.js connection status:', status)
-      onConnectionStatusChange?.(status)
+      onStatusRef.current?.(status)
     })
 
     // Wait for sync, then initialize
@@ -152,7 +166,7 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
       const users = yjsStoreRef.current.getUsers()
       // Filter out self
       const others = users.filter((u) => u.id !== yjsStoreRef.current?.getClientId())
-      onCollaboratorsChange?.(others)
+      onCollabRef.current?.(others)
     }
     awareness.on('change', handleAwarenessChange)
     handleAwarenessChange() // Initial call
@@ -166,7 +180,8 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
       yjsStoreRef.current = null
       initializedRef.current = false
     }
-  }, [roomId, editor, user, onCollaboratorsChange, onConnectionStatusChange, throttle])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId])
 
   return null
 })
