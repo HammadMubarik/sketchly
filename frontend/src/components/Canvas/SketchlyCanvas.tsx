@@ -3,7 +3,7 @@ import type { TLShapeId } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
 import { cnnRecognizer } from '../../lib/cnnRecognizer'
 import type { Point } from '../../lib/cnnRecognizer'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { AutoSaveHandler } from './AutoSaveHandler'
 import { recordRoomVisit } from '../../lib/drawingStorage'
 import { useAuth } from '../../../Contexts/AuthContext'
@@ -673,6 +673,14 @@ export function SketchlyCanvas() {
     console.log('[SketchlyCanvas] roomId changed to:', roomId)
   }, [roomId])
 
+  // Stabilise the props passed to <Tldraw>. New array/function references on
+  // every parent re-render cause tldraw to treat its config as having changed
+  // and tear down child components — that was unmounting YjsSyncBridge.
+  const tldrawShapeUtils = useMemo(() => [UMLClassShapeUtil], [])
+  const handleTldrawMount = useCallback((editor: Editor) => {
+    editorRef.current = editor
+  }, [])
+
   const handleGenerateJava = async () => {
     const editor = editorRef.current
     if (!editor) return
@@ -794,7 +802,7 @@ export function SketchlyCanvas() {
         {generating ? 'Generating...' : '⚡ Generate Java'}
       </button>
       {javaCode && <JavaCodeModal code={javaCode} onClose={() => setJavaCode(null)} />}
-      <Tldraw shapeUtils={[UMLClassShapeUtil]} onMount={(editor) => { editorRef.current = editor }}>
+      <Tldraw shapeUtils={tldrawShapeUtils} onMount={handleTldrawMount}>
         <ShapeRecognitionHandler />
         <ConnectionPoints />
         {roomId && (
