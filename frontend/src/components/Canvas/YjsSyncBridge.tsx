@@ -33,23 +33,35 @@ type Bridge = {
   // spurious React remount.
   lastStatus: Status
   teardown: () => void
+  // If the bridge's React owner unmounts, we schedule a delayed dispose
+  // so the WS actually closes when the user navigates away. A short grace
+  // period covers transient unmount/remount churn (e.g. tldraw rebuilding
+  // children); a remount within the grace cancels the timer and reuses
+  // the live bridge.
+  disposeTimer: ReturnType<typeof setTimeout> | null
 }
 
 const bridges = new Map<string, Bridge>()
+const DISPOSE_GRACE_MS = 400
 
 // Bumped each time the bridge's wire format changes — lets us confirm in the
 // console that a deployed build actually contains a fix, instead of guessing
 // from a stale CDN cache.
-const BRIDGE_BUILD = 'yjs-bridge@no-self-awareness-v3'
+const BRIDGE_BUILD = 'yjs-bridge@dispose-on-unmount-v4'
 console.log(`[YjsSyncBridge] build: ${BRIDGE_BUILD}`)
 
+function disposeBridge(roomId: string) {
+  const b = bridges.get(roomId)
+  if (!b) return
+  if (b.disposeTimer) clearTimeout(b.disposeTimer)
+  b.teardown()
+  b.store.destroy()
+  bridges.delete(roomId)
+}
+
 function disposeBridgesExcept(activeRoomId: string | null) {
-  for (const [rid, bridge] of bridges) {
-    if (rid !== activeRoomId) {
-      bridge.teardown()
-      bridge.store.destroy()
-      bridges.delete(rid)
-    }
+  for (const rid of [...bridges.keys()]) {
+    if (rid !== activeRoomId) disposeBridge(rid)
   }
 }
 
@@ -86,6 +98,7 @@ function ensureBridge(
     statusRef,
     lastStatus: 'connecting',
     teardown: () => {},
+    disposeTimer: null,
   }
 
   let isApplyingRemote = false
@@ -266,12 +279,23 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
   const editor = useEditor()
   const { user } = useAuth()
 
-  // Initialise (or reuse) the module-level bridge for this room. Runs once
-  // per (roomId, editor); spurious React unmounts don't tear down the WS.
+  // Initialise (or reuse) the module-level bridge for this room. The bridge
+  // outlives this component instance: if React unmounts/remounts within the
+  // dispose grace, we reclaim the same WS. But on a real navigation away
+  // (e.g. owner clicks Home), the cleanup schedules disposal so awareness
+  // actually reflects them as offline — otherwise EditPermissionHandler
+  // sees the owner as "still in the room" and grants edit permission to
+  // everyone, defeating the View Only toggle.
   useEffect(() => {
     if (!roomId) return
     const userName = user?.email?.split('@')[0] || 'Anonymous'
     const bridge = ensureBridge(roomId, editor, user?.id, userName)
+
+    // Reclaim a bridge that was about to be disposed.
+    if (bridge.disposeTimer) {
+      clearTimeout(bridge.disposeTimer)
+      bridge.disposeTimer = null
+    }
 
     bridge.collabRef.current = onCollaboratorsChange
     bridge.statusRef.current = onConnectionStatusChange
@@ -280,7 +304,12 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
     // immediately reflects whatever the live WS is reporting.
     onConnectionStatusChange?.(bridge.lastStatus)
 
-    // No teardown here — see Bridge docblock.
+    return () => {
+      const b = bridges.get(roomId)
+      if (!b) return
+      if (b.disposeTimer) clearTimeout(b.disposeTimer)
+      b.disposeTimer = setTimeout(() => disposeBridge(roomId), DISPOSE_GRACE_MS)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, editor, user?.id])
 
