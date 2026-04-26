@@ -26,7 +26,6 @@ app.post('/api/generate-java', async (req, res) => {
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-7',
       max_tokens: 4096,
-      temperature: 0,
       messages: [{
         role: 'user',
         content: [
