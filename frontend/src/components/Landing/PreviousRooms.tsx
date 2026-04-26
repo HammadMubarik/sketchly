@@ -66,7 +66,12 @@ function RoomCard({ visit, index, isOwned, onJoinRoom, onDelete }: {
 
   const handleToggleEdit = async (e: React.MouseEvent, user: RoomVisit) => {
     e.stopPropagation()
-    const newCanEdit = !user.can_edit
+    // can_edit defaults to null in the DB for fresh joiners, and
+    // getUserEditPermission treats null as "can edit". Normalise here so the
+    // first toggle flips to "View Only" instead of just writing true (which
+    // is what null already means and would require a second click).
+    const currentCanEdit = user.can_edit ?? true
+    const newCanEdit = !currentCanEdit
     await updateUserEditPermission(user.id, newCanEdit)
     setRoomUsers((prev) =>
       prev.map((u) => u.id === user.id ? { ...u, can_edit: newCanEdit } : u)
@@ -134,23 +139,26 @@ function RoomCard({ visit, index, isOwned, onJoinRoom, onDelete }: {
             <div className="text-xs text-neutral-400">No other users have joined</div>
           ) : (
             <div className="space-y-2">
-              {otherUsers.map((u) => (
-                <div key={u.id} className="flex items-center justify-between text-xs">
-                  <span className="text-neutral-700 dark:text-neutral-300 truncate flex-1">
-                    {u.user_id.slice(0, 8)}...
-                  </span>
-                  <button
-                    onClick={(e) => handleToggleEdit(e, u)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                      u.can_edit
-                        ? 'bg-neutral-900 text-white hover:bg-neutral-800'
-                        : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-600'
-                    }`}
-                  >
-                    {u.can_edit ? 'Can Edit' : 'View Only'}
-                  </button>
-                </div>
-              ))}
+              {otherUsers.map((u) => {
+                const canEdit = u.can_edit ?? true
+                return (
+                  <div key={u.id} className="flex items-center justify-between text-xs">
+                    <span className="text-neutral-700 dark:text-neutral-300 truncate flex-1">
+                      {u.user_id.slice(0, 8)}...
+                    </span>
+                    <button
+                      onClick={(e) => handleToggleEdit(e, u)}
+                      className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                        canEdit
+                          ? 'bg-neutral-900 text-white hover:bg-neutral-800'
+                          : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-600'
+                      }`}
+                    >
+                      {canEdit ? 'Can Edit' : 'View Only'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
