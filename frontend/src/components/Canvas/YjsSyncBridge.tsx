@@ -40,7 +40,7 @@ const bridges = new Map<string, Bridge>()
 // Bumped each time the bridge's wire format changes — lets us confirm in the
 // console that a deployed build actually contains a fix, instead of guessing
 // from a stale CDN cache.
-const BRIDGE_BUILD = 'yjs-bridge@scope-filter-v2'
+const BRIDGE_BUILD = 'yjs-bridge@no-self-awareness-v3'
 console.log(`[YjsSyncBridge] build: ${BRIDGE_BUILD}`)
 
 function disposeBridgesExcept(activeRoomId: string | null) {
@@ -212,10 +212,30 @@ function ensureBridge(
   }
   window.addEventListener('pointermove', handlePointerMove)
 
-  // Awareness -> collaborators
-  const handleAwarenessChange = () => {
+  // Awareness -> collaborators.
+  //
+  // Awareness 'change' fires on EVERY local cursor move (since we update
+  // our own awareness state in handlePointerMove). If we naively notified
+  // the parent each time, setCollaborators would run ~20×/sec, parent
+  // re-renders cascade through <Tldraw>, and tldraw's UI subtree gets torn
+  // out under the render storm. So:
+  //   1. Ignore awareness events whose only changed clients are ourselves.
+  //   2. Then dedupe: only notify when the "others" list actually differs
+  //      from the previous notification (cheap JSON compare is fine here).
+  let lastOthersSnapshot = ''
+  const handleAwarenessChange = (
+    changes?: { added: number[]; updated: number[]; removed: number[] },
+  ) => {
+    const myClientId = store.getClientId()
+    if (changes) {
+      const changedIds = [...changes.added, ...changes.updated, ...changes.removed]
+      if (changedIds.length > 0 && changedIds.every((id) => id === myClientId)) return
+    }
     const users = store.getUsers()
-    const others = users.filter((u) => u.id !== store.getClientId())
+    const others = users.filter((u) => u.id !== myClientId)
+    const snapshot = JSON.stringify(others)
+    if (snapshot === lastOthersSnapshot) return
+    lastOthersSnapshot = snapshot
     collabRef.current?.(others)
   }
   awareness.on('change', handleAwarenessChange)
