@@ -806,7 +806,11 @@ export function SketchlyCanvas() {
         {generating ? 'Generating...' : '⚡ Generate Java'}
       </button>
       {javaCode && <JavaCodeModal code={javaCode} onClose={() => setJavaCode(null)} />}
-      <Tldraw shapeUtils={tldrawShapeUtils} onMount={handleTldrawMount}>
+      <Tldraw
+        shapeUtils={tldrawShapeUtils}
+        onMount={handleTldrawMount}
+        licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY}
+      >
         <ShapeRecognitionHandler />
         <ConnectionPoints />
         {roomId && (
