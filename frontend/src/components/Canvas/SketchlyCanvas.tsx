@@ -664,6 +664,15 @@ export function SketchlyCanvas() {
   const [generating, setGenerating] = useState(false)
   const editorRef = useRef<Editor | null>(null)
 
+  console.log('[SketchlyCanvas] render, roomId:', roomId)
+  useEffect(() => {
+    console.log('[SketchlyCanvas] MOUNTED')
+    return () => console.log('[SketchlyCanvas] UNMOUNTED')
+  }, [])
+  useEffect(() => {
+    console.log('[SketchlyCanvas] roomId changed to:', roomId)
+  }, [roomId])
+
   const handleGenerateJava = async () => {
     const editor = editorRef.current
     if (!editor) return

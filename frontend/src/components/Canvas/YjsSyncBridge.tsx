@@ -31,8 +31,14 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
   onCollaboratorsChange,
   onConnectionStatusChange,
 }: YjsSyncBridgeProps) {
+  console.log('[YjsSyncBridge] render, roomId:', roomId)
   const editor = useEditor()
   const { user } = useAuth()
+
+  useEffect(() => {
+    console.log('[YjsSyncBridge] MOUNTED')
+    return () => console.log('[YjsSyncBridge] UNMOUNTED')
+  }, [])
 
   const yjsStoreRef = useRef<YjsStore | null>(null)
   const isApplyingRemoteRef = useRef(false)
