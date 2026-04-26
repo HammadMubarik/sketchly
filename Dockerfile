@@ -8,8 +8,10 @@ WORKDIR /app
 # Vite inlines these at build time, so they must be present here, not at runtime.
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_TLDRAW_LICENSE_KEY
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_TLDRAW_LICENSE_KEY=$VITE_TLDRAW_LICENSE_KEY
 
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
