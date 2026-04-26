@@ -3,6 +3,7 @@
 **A browser-based collaborative diagramming tool with CNN shape recognition and Java code generation.**
 
 **Live demo: [www.sketchly.ie](https://www.sketchly.ie)**
+**Screencast: [youtu.be/fZqs1pA1kQk](https://youtu.be/fZqs1pA1kQk)**
 
 Sketchly closes the gap between formal diagramming editors (Visio, Lucidchart, draw.io) and freehand sketching tools (Excalidraw). Users draw shapes by hand and a Convolutional Neural Network running entirely in the browser converts each stroke into a clean vector diagram element in real time. Multiple users can edit the same diagram concurrently via CRDTs, and a completed UML class diagram can be converted to executable Java source code with a single click.
 
