@@ -85,6 +85,17 @@ function ensureBridge(
   let isApplyingRemote = false
   let initialized = false
 
+  // Tldraw v4 splits records into "document" scope (shapes/pages — shared) and
+  // "session" scope (instance/camera/page-state — per-tab). Syncing session
+  // records corrupts other clients' UI (e.g. inheriting another tab's tool
+  // selection or readonly state) and was making our toolbar disappear.
+  const isDocumentScope = (record: { typeName: string } | undefined): boolean => {
+    if (!record) return false
+    const schema = (editor.store as any).schema
+    const scope = schema?.types?.[record.typeName]?.scope
+    return scope === 'document'
+  }
+
   store.onConnectionStatusChange((status) => {
     console.log('Y.js connection status:', status)
     bridge.lastStatus = status
@@ -94,27 +105,43 @@ function ensureBridge(
   store.waitForSync().then(() => {
     console.log('Y.js synced with server')
 
+    // One-time scrub: remove any session-scope records that previous buggy
+    // builds may have pushed into this room. Without this, every client
+    // joining inherits a stale `instance` record and the UI breaks again.
+    const staleKeys: string[] = []
+    yShapes.forEach((record, key) => {
+      if (!isDocumentScope(record)) staleKeys.push(key)
+    })
+    if (staleKeys.length > 0) {
+      console.log(`Scrubbing ${staleKeys.length} stale session-scope records from Y.js`)
+      staleKeys.forEach((key) => yShapes.delete(key))
+    }
+
     if (yShapes.size > 0) {
-      console.log(`Loading ${yShapes.size} shapes from Y.js`)
       isApplyingRemote = true
+      let applied = 0
       editor.store.mergeRemoteChanges(() => {
         yShapes.forEach((record) => {
+          if (!isDocumentScope(record)) return
           editor.store.put([record])
+          applied++
         })
       })
       isApplyingRemote = false
+      console.log(`Loaded ${applied}/${yShapes.size} document-scope records from Y.js`)
     } else {
-      const allRecords = editor.store.allRecords()
-      allRecords.forEach((record) => {
+      const documentRecords = editor.store.allRecords().filter(isDocumentScope)
+      documentRecords.forEach((record) => {
         yShapes.set(record.id, record)
       })
-      console.log(`Pushed ${allRecords.length} records to Y.js`)
+      console.log(`Pushed ${documentRecords.length} records to Y.js`)
     }
 
     initialized = true
   })
 
-  // Local tldraw -> Y.js
+  // Local tldraw -> Y.js. listen() already filters scope:'document', but we
+  // re-filter records defensively in case tldraw widens that contract.
   const removeStoreListener = editor.store.listen(
     (entry) => {
       if (isApplyingRemote) return
@@ -122,13 +149,13 @@ function ensureBridge(
 
       const { added, updated, removed } = entry.changes
       Object.values(added).forEach((record) => {
-        yShapes.set(record.id, record)
+        if (isDocumentScope(record)) yShapes.set(record.id, record)
       })
       Object.values(updated).forEach(([, record]) => {
-        yShapes.set(record.id, record)
+        if (isDocumentScope(record)) yShapes.set(record.id, record)
       })
       Object.values(removed).forEach((record) => {
-        yShapes.delete(record.id)
+        if (isDocumentScope(record)) yShapes.delete(record.id)
       })
     },
     { source: 'user', scope: 'document' },
@@ -144,7 +171,7 @@ function ensureBridge(
       event.changes.keys.forEach((change: any, key: string) => {
         if (change.action === 'add' || change.action === 'update') {
           const record = yShapes.get(key) as TLRecord
-          if (record) {
+          if (record && isDocumentScope(record)) {
             editor.store.put([record])
           }
         } else if (change.action === 'delete') {
