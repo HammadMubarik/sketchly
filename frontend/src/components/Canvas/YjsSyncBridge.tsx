@@ -220,11 +220,14 @@ export const YjsSyncBridge = track(function YjsSyncBridge({
   }, [roomId, editor, user?.id])
 
   // Keep the refs pointing at the latest parent setters across re-renders.
-  const bridge = roomId ? bridges.get(roomId) : null
-  if (bridge) {
+  // Done in an effect (not during render) to stay clean under React 19.
+  useEffect(() => {
+    if (!roomId) return
+    const bridge = bridges.get(roomId)
+    if (!bridge) return
     bridge.collabRef.current = onCollaboratorsChange
     bridge.statusRef.current = onConnectionStatusChange
-  }
+  })
 
   return null
 })
