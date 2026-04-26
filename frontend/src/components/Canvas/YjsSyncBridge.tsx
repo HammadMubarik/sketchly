@@ -37,6 +37,12 @@ type Bridge = {
 
 const bridges = new Map<string, Bridge>()
 
+// Bumped each time the bridge's wire format changes — lets us confirm in the
+// console that a deployed build actually contains a fix, instead of guessing
+// from a stale CDN cache.
+const BRIDGE_BUILD = 'yjs-bridge@scope-filter-v2'
+console.log(`[YjsSyncBridge] build: ${BRIDGE_BUILD}`)
+
 function disposeBridgesExcept(activeRoomId: string | null) {
   for (const [rid, bridge] of bridges) {
     if (rid !== activeRoomId) {
@@ -85,15 +91,24 @@ function ensureBridge(
   let isApplyingRemote = false
   let initialized = false
 
-  // Tldraw v4 splits records into "document" scope (shapes/pages — shared) and
-  // "session" scope (instance/camera/page-state — per-tab). Syncing session
-  // records corrupts other clients' UI (e.g. inheriting another tab's tool
-  // selection or readonly state) and was making our toolbar disappear.
+  // Tldraw v4 splits records into "document" scope (shapes/pages/assets —
+  // shared) and "session" scope (instance/camera/page-state — per-tab).
+  // Syncing session records corrupts other clients' UI (e.g. inheriting
+  // another tab's tool selection or readonly state) and was making our
+  // toolbar disappear after Y.js applied a stale `instance` record.
+  //
+  // Hardcoded list rather than querying editor.store.schema.types[X].scope
+  // because the schema API shape varies between tldraw point releases.
+  const SESSION_TYPENAMES = new Set([
+    'instance',
+    'instance_page_state',
+    'instance_presence',
+    'camera',
+    'pointer',
+  ])
   const isDocumentScope = (record: { typeName: string } | undefined): boolean => {
     if (!record) return false
-    const schema = (editor.store as any).schema
-    const scope = schema?.types?.[record.typeName]?.scope
-    return scope === 'document'
+    return !SESSION_TYPENAMES.has(record.typeName)
   }
 
   store.onConnectionStatusChange((status) => {
@@ -109,11 +124,14 @@ function ensureBridge(
     // builds may have pushed into this room. Without this, every client
     // joining inherits a stale `instance` record and the UI breaks again.
     const staleKeys: string[] = []
+    const typeCounts: Record<string, number> = {}
     yShapes.forEach((record, key) => {
+      typeCounts[record.typeName] = (typeCounts[record.typeName] ?? 0) + 1
       if (!isDocumentScope(record)) staleKeys.push(key)
     })
+    console.log('[YjsSyncBridge] yShapes typeName counts:', typeCounts)
     if (staleKeys.length > 0) {
-      console.log(`Scrubbing ${staleKeys.length} stale session-scope records from Y.js`)
+      console.log(`[YjsSyncBridge] Scrubbing ${staleKeys.length} stale session-scope records:`, staleKeys)
       staleKeys.forEach((key) => yShapes.delete(key))
     }
 
@@ -128,13 +146,13 @@ function ensureBridge(
         })
       })
       isApplyingRemote = false
-      console.log(`Loaded ${applied}/${yShapes.size} document-scope records from Y.js`)
+      console.log(`[YjsSyncBridge] Loaded ${applied}/${yShapes.size} document-scope records from Y.js`)
     } else {
       const documentRecords = editor.store.allRecords().filter(isDocumentScope)
       documentRecords.forEach((record) => {
         yShapes.set(record.id, record)
       })
-      console.log(`Pushed ${documentRecords.length} records to Y.js`)
+      console.log(`[YjsSyncBridge] Pushed ${documentRecords.length} document-scope records to Y.js`)
     }
 
     initialized = true
