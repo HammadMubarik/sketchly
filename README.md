@@ -191,8 +191,6 @@ The script generates 100,000 synthetic images (10,000 per class) with hand tremo
 6. Diagram snapshots are auto-saved to Supabase every five seconds.
 7. When the user clicks **Generate Java**, the canvas is exported as a PNG and posted to the backend, which forwards it to Claude. The returned Java code is cleaned up and shown in a modal.
 
-For a full technical write-up, see the dissertation in `backend/SW4_FYP_Dissertation_Final_v7.zip`.
-
 ---
 
 ## Author
