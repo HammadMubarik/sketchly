@@ -55,7 +55,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
+    // Local scope only clears the client-side session; we don't need to
+    // revoke other devices on a logout button click. Default 'global' scope
+    // hits /auth/v1/logout?scope=global which 403s in Firefox when its
+    // storage protection has dropped the access token Supabase wants in
+    // the Authorization header — that left the user "stuck logged in".
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    // Belt-and-braces: if the server call still failed for any reason,
+    // wipe local auth state ourselves so the UI reflects logged-out.
+    if (error) {
+      setSession(null)
+      setUser(null)
+    }
     return { error }
   }
 
