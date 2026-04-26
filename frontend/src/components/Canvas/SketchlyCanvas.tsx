@@ -30,8 +30,10 @@ function SaveStatusIndicator({
     <div
       style={{
         position: 'absolute',
-        bottom: '1rem',
-        right: '1rem',
+        // Tldraw v4 reserves bottom-right for its watermark and degrades the
+        // whole UI if the watermark is obscured. Anchor to top-right instead.
+        top: '1rem',
+        right: '7rem',
         zIndex: 1000,
         background: 'rgba(255,255,255,0.9)',
         backdropFilter: 'blur(8px)',
@@ -782,7 +784,9 @@ export function SketchlyCanvas() {
         disabled={generating}
         style={{
           position: 'fixed',
-          bottom: '1rem',
+          // Anchored top-right (next to Share). Tldraw v4 owns the bottom-right
+          // for its watermark and disables the whole UI if it's covered.
+          top: '4rem',
           right: '1rem',
           zIndex: 1000,
           display: 'flex',
